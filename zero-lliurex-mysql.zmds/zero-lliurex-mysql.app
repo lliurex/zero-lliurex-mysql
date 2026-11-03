@@ -1,0 +1,14 @@
+Name=MySQL
+Comment=Installs MySQL server
+Comment[es]=Instala MySQL
+Comment[qcv]=Instaŀla MySQL
+Comment[ca_es]=Instaŀla MySQL
+Icon=zero-lliurex-mysql
+Groups=sudo;admins;teachers
+Category=Database
+ScriptPath=zero-lliurex-mysql.zmd
+Using=pkexec
+Service=False
+Modal=True
+Locks=zero-lliurex-mysql
+Show=False

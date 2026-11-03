@@ -1,0 +1,266 @@
+#!/bin/bash
+set -e
+#set -x
+
+COMPOSE_FILE_PATH=/usr/share/zero-lliurex-mysql/docker-compose.yml
+
+SRC="${BASH_SOURCE[0]}"
+
+ACTION=$1
+
+if [ -n "$PKEXEC_UID" ]; then
+    IDUSER=$PKEXEC_UID
+    USER=$(getent passwd $IDUSER|cut -d: -f1)
+    IDGRP=$(id -g $USER)
+    HOME_USER=$(getent passwd $IDUSER|cut -d: -f6)
+else
+    IDUSER="$(id -u)"
+    IDGRP="$(id -g)"
+    USER="$(whoami)"
+    HOME_USER="$HOME"
+fi
+
+check_run(){
+    local tgt=$1
+
+    if [ -z "$tgt" ]; then
+	return 1
+    fi
+    DEBUG=0
+    if [ -n "$(set -o |grep xtrace|grep on)" ];then
+	DEBUG=1
+    fi
+    if [ $DEBUG -eq 1 ]; then
+	if $tgt ; then
+	    return 0
+	else
+	    return 1
+	fi
+    else
+	if $tgt 2>/dev/null >/dev/null; then
+	    return 0
+	else
+	    return 1
+	fi
+    fi
+}
+
+check_installed(){
+    local tgt="$1"
+    if [ -z "$tgt" ];then
+	echo "Empty parameter calling check_installed"
+	return 1
+    fi
+    if [ -f "/usr/bin/${tgt}" ]; then
+	# echo "$tgt installed"
+	return 0
+    fi
+    echo "'$tgt' not available"
+    return 1
+}
+
+check_dir(){
+    local LDIR="$1"
+    if [ ! -d "$LDIR" ]; then
+	if ! mkdir -p "$LDIR";then
+	    echo "Unable to create $LDIR"
+	    exit 1
+	fi
+    fi
+    export RET="$(readlink -f $LDIR)"
+}
+
+do_checks(){
+    export_vars
+    check_installed docker
+    check_installed docker-compose
+    if check_run "docker ps"; then
+	export DOCKERCMD="docker"
+    else
+	if check_run "pkexec $SRC $ACTION"; then
+	    exit $?
+	else
+	    if check_run "sudo docker ps"; then
+		export DOCKERCMD="sudo -E docker"
+	    else
+		echo "Unable to run docker"
+		exit 1
+	    fi
+	fi
+    fi
+    if [ ! -f "$COMPOSE_FILE_PATH" ]; then
+	echo "Compose file unavailable, unable to continue"
+	exit 1
+    fi 
+    if check_run "docker-compose -f $COMPOSE_FILE_PATH images"; then
+	export COMPOSECMD="docker-compose -f $COMPOSE_FILE_PATH"
+    else
+	if check_run "pkexec $SRC $ACTION"; then
+	    exit $?
+	else
+	    if check_run "sudo docker-compose -f $COMPOSE_FILE_PATH images"; then
+		export COMPOSECMD="sudo -E docker-compose -f $COMPOSE_FILE_PATH"
+	    else
+		echo "Unable to run docker-compose"
+	        exit 1
+	    fi
+	fi
+    fi
+}
+
+start_mysql(){
+    $COMPOSECMD start 
+}
+
+stop_mysql(){
+    $COMPOSECMD stop
+}
+
+remove_mysql(){
+    $COMPOSECMD down 2>/dev/null 
+}
+
+export_vars(){
+	export MYSQL_ROOT_PASSWORD=12345
+	export MYSQL_DATABASE=mysql
+	export MYSQL_DATA_DIR=/var/lib/mysql
+    export USER_ID=$IDUSER
+    export GROUP_ID=$IDGRP
+}
+ret_vars(){
+    RET="MYSQL_DATA_DIR=$MYSQL_DATA_DIR MYSQL_DATABASE=$MYSQL_DATABASE IDUSER=$IDUSER IDGRP=$IDGRP HOME=$HOME_USER HOME_USER=$HOME_USER"
+}
+
+create_mysql(){
+    $COMPOSECMD up -d
+}
+
+instances_created(){
+    local INSTANCES="$($COMPOSECMD ps -q)"
+    if [ -z "$INSTANCES" ]; then
+	return 1
+    else
+	return 0
+    fi
+}
+
+list_mysql_volumes(){
+    VOLS=$($DOCKERCMD volume ls -q|grep mysql||true)
+    RET=${VOLS:-"empty"}
+}
+
+clean_mysql(){
+    remove_mysql
+	list_mysql_volumes
+    MYSQL_VOLUMES="$RET"
+    if [ -n "$MYSQL_VOLUMES" -a "x$MYSQL_VOLUMES" != "xempty" ];then
+	for volume in $MYSQL_VOLUMES; do
+	    clean_volume $volume
+	done
+    fi
+}
+
+clean_volume(){
+    local vol="$1"
+    if [ -n "$vol" ]; then
+	echo "Cleaning docker volume $vol"
+	$DOCKERCMD volume rm $vol
+    fi
+}
+
+remove_dirs(){
+    if [ -d "$MAIN_CONFIG_DIR" ]; then
+	echo "Removing $MAIN_CONFIG_DIR"
+	rm -rf "$MAIN_CONFIG_DIR"
+    fi
+}
+
+help(){
+    echo " mysqlrun: Manages MySQL instance"
+    echo " "
+    echo " Usage:"
+    echo "      [sudo] mysqlrun [ACTION]"
+    echo " "
+    echo " Actions:"
+    echo "      start : start previously created MySQL server services instance"
+    echo "      stop : stop MySQL server services instance"
+    echo "      restart : restart MySQL server services instance"
+    echo "      create : create and start new MySQL server services instance"
+    echo "      remove : stop and destroy existing MySQL server services instance"
+    echo "      clean : stop and destroy existing MySQL server services instance with all volume data"
+    echo "      reallyclean : make clean action and remove personal user data into his home"
+    echo "      reconfigure : (Not implemented)"
+}
+
+if [ -z "$ACTION" ];then
+    help
+    exit 0
+fi
+
+do_checks
+
+case $ACTION in
+
+    start)
+	echo "Start mysql";
+	if instances_created; then
+	    start_mysql
+	else
+	    create_mysql
+	fi
+    ;;
+
+    stop)
+	echo "Stop mysql";
+	stop_mysql
+    ;;
+
+    restart)
+	echo "Restart mysql";
+	stop_mysql
+	start_mysql
+    ;;
+
+    remove)
+	echo "Removing mysql";
+	remove_mysql
+    ;;
+
+    create)
+	echo "Creating mysql";
+	if instances_created; then
+	    start_mysql
+	else
+	    create_mysql
+	fi
+    ;;
+    
+    clean)
+	echo "Cleaning mysql";
+	clean_mysql
+    ;;
+
+    reallyclean)
+	echo "Full cleaning mysql";
+	clean_mysql
+	remove_dirs
+    ;;
+
+    reconfigure)
+	echo "Reconfigure";
+    ;;
+
+    initialize)
+	echo "Initializing"
+	initialize_mysql
+	echo "Login with user root and password 12345 at localhost:3306"
+    ;;
+
+    *)
+	help
+    ;;
+
+esac
+
+echo "End"
+exit 0

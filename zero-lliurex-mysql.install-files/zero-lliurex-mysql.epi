@@ -1,0 +1,10 @@
+{
+	"type":"mix",
+	"pkg_list": [{"name":"mysql","custom_name":"MySQL Server","custom_icon":"mysql.png","type":"file"},{"name":"mysql-workbench-community","custom_name":"MySQL Workbench","custom_icon":"workbench.png","type":"snap"}], 
+	"script": {"name":"/usr/share/zero-lliurex-mysql/zero-lliurex-mysql_script", "remove":true,"download":true,"getStatus":true,"installPackage":true,"preInstall":true,"postInstall":true},
+	"repository": [],
+	"zomando":"zero-lliurex-mysql",
+	"custom_icon_path":"/usr/share/zero-lliurex-mysql/",
+	"depends": "/usr/share/zero-lliurex-docker/docker.epi",
+	"selection_enabled":{"active":true,"all_selected":false}
+}
