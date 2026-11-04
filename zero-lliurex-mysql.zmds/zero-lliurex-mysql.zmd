@@ -1,2 +1,2 @@
 #!/bin/bash
-epi-gtk /usr/share/zero-lliruex-mysql/zero-lliurex-mysql.epi $1
+epi-gtk /usr/share/zero-lliurex-mysql/zero-lliurex-mysql.epi $1

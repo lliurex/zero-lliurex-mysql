@@ -21,18 +21,6 @@
   <defs
      id="defs2">
     <pattern
-       inkscape:collect="always"
-       patternUnits="userSpaceOnUse"
-       width="30.066020"
-       height="5.1805778"
-       id="Wavy"
-       inkscape:stockid="Wavy">
-      <path
-         style="fill:black;stroke:none;"
-         d="M 7.597,0.061 C 5.079,-0.187 2.656,0.302 -0.01,1.788 L -0.01,3.061 C 2.773,1.431 5.173,1.052 7.472,1.280 C 9.770,1.508 11.969,2.361 14.253,3.218 C 18.820,4.931 23.804,6.676 30.066,3.061 L 30.062,1.788 C 23.622,5.497 19.246,3.770 14.691,2.061 C 12.413,1.207 10.115,0.311 7.597,0.061 z "
-         id="path2765" />
-    </pattern>
-    <pattern
        patternUnits="userSpaceOnUse"
        width="256"
        height="256"
@@ -135,19 +123,6 @@
          stdDeviation="0.31998797"
          id="feGaussianBlur2248" />
     </filter>
-    <filter
-       inkscape:collect="always"
-       style="color-interpolation-filters:sRGB"
-       id="filter3171"
-       x="-0.037201622"
-       y="-0.076558501"
-       width="1.0744032"
-       height="1.153117">
-      <feGaussianBlur
-         inkscape:collect="always"
-         stdDeviation="0.96523453"
-         id="feGaussianBlur3173" />
-    </filter>
   </defs>
   <sodipodi:namedview
      inkscape:document-rotation="0"
@@ -164,8 +139,8 @@
      showgrid="false"
      inkscape:current-layer="layer1"
      inkscape:document-units="mm"
-     inkscape:cy="47.780293"
-     inkscape:cx="133.27396"
+     inkscape:cy="48.080798"
+     inkscape:cx="133.57447"
      inkscape:zoom="3.3277318"
      inkscape:pageshadow="2"
      inkscape:pageopacity="0.0"
@@ -198,17 +173,10 @@
      inkscape:groupmode="layer"
      inkscape:label="Capa 1">
     <rect
-       style="opacity:0.106;fill:url(#Wavy);fill-opacity:1;stroke:#ab6509;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;filter:url(#filter3171)"
-       id="rect1058"
-       width="64.958534"
-       height="31.564919"
-       x="-1.1926292"
-       y="266.38516" />
-    <rect
-       style="opacity:1;fill:#f7f7f7;fill-opacity:1;stroke:none;stroke-width:0.164955;stroke-linecap:round;stroke-linejoin:round"
+       style="opacity:1;fill:#f7f7f7;fill-opacity:1;stroke:none;stroke-width:0.228141;stroke-linecap:round;stroke-linejoin:round"
        id="rect3224"
        width="63.368359"
-       height="15.504179"
+       height="29.656712"
        x="0.079508737"
        y="268.13434" />
     <text
