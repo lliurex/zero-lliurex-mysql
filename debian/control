@@ -1,0 +1,13 @@
+Source: zero-lliurex-mysql
+Section: x11
+Priority: optional
+Maintainer: Equipo LliureX <lliurex@gva.es>
+Uploaders: Daniel Duran Vecino <daduve@gmail.com>
+Build-Depends: llxsrchelper,debhelper (>= 10), zero-dev, inkscape(>=0.47)
+Standards-Version: 4.1.2
+
+Package: zero-lliurex-mysql
+Architecture: all
+Depends: zero-center,epi-gtk,libqt6sql6-psql
+Description: Fp Administrative
+	Adding shortcut in zero-center to install MySQL docker and Workbench snap
