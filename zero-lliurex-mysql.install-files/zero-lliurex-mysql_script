@@ -4,6 +4,7 @@ ACTION="$1"
 
 shift
 
+PFILE=/usr/share/zero-lliurex-mysql/net.lliurex.mysqlrun.policy 
 PACKAGE_LIST=$@
 
 # START Define variables
@@ -22,17 +23,14 @@ case $ACTION in
 				else
 					echo 1
 				fi
-
-
-			if [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
+			elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
 					if [ -n "$(docker images -q mysql:${MYSQL_RELEASE})" ]; then
 						echo 0
 					else
 						echo 1
 					fi
-				else
-					echo 1
-				fi
+			else
+				echo 1
 			fi
 	;;
 
@@ -45,11 +43,9 @@ case $ACTION in
 				if [ -n "${inst}" ]; then
 					docker rm -f "${inst}"
 				fi
-				#cp /usr/share/zero-lliurex-mysql/odoo.desktop /usr/share/applications/
-				#cp /usr/share/zero-lliurex-mysql/odoo.png /usr/share/icons
-				#cp /usr/share/zero-lliurex-mysql/odoorun /usr/bin/odoorun
-				#cp /usr/share/zero-lliurex-mysql/net.lliurex.odoorun.policy /usr/share/polkit-1/actions/
-				#chmod +x /usr/bin/odoorun
+				cp /usr/share/zero-lliurex-mysql/mysqlrun /usr/bin/mysqlrun
+				chmod +x /usr/bin/mysqlrun
+				cp $FILE /usr/share/polkit-1/actions/
 				systemctl restart polkit
 				echo " * * Finished * * "
 				echo " **********************************************************"
@@ -83,8 +79,8 @@ case $ACTION in
 				if [ -n "${imgs}" ];then
 					docker rmi "${imgs}"
 				fi
-				#rm -f /usr/bin/odoorun
-				#rm -f /usr/share/polkit-1/actions/net.lliurex.odoorun.policy
+				rm -f /usr/bin/mysqlrun
+				rm -f $PFILE
 				systemctl restart polkit
 				echo " * * Finished * * "
 			fi
