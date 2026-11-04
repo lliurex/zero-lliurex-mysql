@@ -5,6 +5,7 @@ ACTION="$1"
 shift
 
 PFILE=/usr/share/zero-lliurex-mysql/net.lliurex.mysqlrun.policy 
+ICON=/usr/share/zero-lliurex-mysql/mysql.png
 PACKAGE_LIST=$@
 
 # START Define variables
@@ -44,6 +45,7 @@ case $ACTION in
 					docker rm -f "${inst}"
 				fi
 				cp /usr/share/zero-lliurex-mysql/mysqlrun /usr/bin/mysqlrun
+				cp $ICON /usr/share/applications
 				chmod +x /usr/bin/mysqlrun
 				cp $FILE /usr/share/polkit-1/actions/
 				systemctl restart polkit
