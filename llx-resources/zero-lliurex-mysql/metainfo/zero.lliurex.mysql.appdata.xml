@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+<id>zero.lliurex.mysql</id>
+<metadata_license>CC0-1.0</metadata_license>
+<name>Gambas 3</name>
+<name xml:lang="ca">MySQL 8</name>
+<name xml:lang="es">MySQL 8</name>
+<summary>Install MySQL Docker and Workbench</summary>
+<summary xml:lang="es">Instalador para MySQL Docker y Workbench</summary>
+<summary xml:lang="ca">Intaŀlador per al MySQL Docker i Workbench</summary>
+<description>
+<p>MySQL is a relational database management system developed under dual license: general public license/commercial license by Oracle Corporation. It is considered the most popular open source database in the world and one of the most popular overall, along with Oracle and Microsoft SQL Server, all for web development environments.</p>
+<p xml:lang="es">MySQL es un sistema de gestión de bases de datos relacional desarrollado bajo licencia dual: licencia pública general/licencia comercial por Oracle Corporation. Está considerada la base de datos de código abierto más popular del mundo y una de las más populares en general, junto a Oracle y Microsoft SQL Server, todas para entornos de desarrollo web.</p>
+<p xml:lang="ca">MySQL és un sistema relacional de gestió de bases de dades desenvolupat sota doble llicència: llicència pública general/llicència comercial per Oracle Corporation. Es considera la base de dades de codi obert més popular del món i un dels més populars en general, juntament amb Oracle i Microsoft SQL Server, tots per a entorns de desenvolupament web.</p
+</description>
+<categories>
+<category>Development</category>
+<category>Database</category>
+</categories>
+<icon type="stock">mysql</icon>
+<keywords>
+<keyword>mysql</keyword>
+<keyword>db</keyword>
+<keyword>oracle</keyword>
+<keyword>mariadb</keyword>
+<keyword>postgre</keyword>
+<keyword>sql</keyword>
+<keyword>db2</keyword>
+</keywords>
+<keywords xml:lang="ca">
+<keyword>dades</keyword>
+</keywords>
+<keywords xml:lang="es">
+<keyword>datos</keyword>
+</keywords>
+</component>
