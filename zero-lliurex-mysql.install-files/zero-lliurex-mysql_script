@@ -52,6 +52,7 @@ case $ACTION in
 				echo " * * Finished * * "
 				echo " **********************************************************"
 				echo " *################### MYSQL INSTALLED ####################*"
+				echo " *   Use /usr/bin/mysqlrun to manage the MySQL instance   *"
 				echo " **********************************************************"
 			fi
 			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
