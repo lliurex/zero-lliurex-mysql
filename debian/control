@@ -8,6 +8,6 @@ Standards-Version: 4.1.2
 
 Package: zero-lliurex-mysql
 Architecture: all
-Depends: zero-center,epi-gtk,libqt6sql6-psql
+Depends: zero-center,epi-gtk
 Description: Fp Administrative
 	Adding shortcut in zero-center to install MySQL docker and Workbench snap
