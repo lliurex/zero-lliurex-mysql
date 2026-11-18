@@ -28,10 +28,11 @@ case $ACTION in
 				fi
 			elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
 					USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
+					USER_HOME=/home/lliurex
 					if [ -e "${USER_HOME}/.local/bin/mysqld_safe" ]; then
 						echo 0
 					else
-						echo 1
+						[ -e ${USER_HOME}/.local/mysql-*minimal ] && echo 0 || echo 1
 					fi
 			else
 				echo 1
@@ -55,44 +56,60 @@ case $ACTION in
 				mv -v $MYSQL_DIR $USER_HOME/.local/
 				mkdir $USER_HOME/.local/bin/ || true
 				ln -vs $USER_HOME/.local/$MYSQL_DIR/bin/* $USER_HOME/.local/bin/
-				$USER_HOME/.local/$MYSQL_DIR/bin/mysqld --initialize --user=$USER_NAME
-				#/usr/bin/desktop-file-install /usr/share/zero-lliurex-soundshow/app.soundshow.soundshow.desktop 
+				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/bin/
+				$USER_HOME/.local/$MYSQL_DIR/bin/mysqld --initialize-insecure --user=$USER_NAME
 				echo " * * Finished * * "
 				echo " **********************************************************"
 				echo " *################### MYSQL INSTALLED ####################*"
+				echo " ROOT PASSWORD IS NOT SET. YOU MUST SET ONE AS SOON AS POSSIBLE"
 				echo " **********************************************************"
 			fi
 			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
 				echo "****Installing Workbench... please wait****"
 				snap install mysql-workbench-community
+				sudo snap connect mysql-workbench-community:password-manager-service :password-manager-service
 			fi
 	;;
 
 	remove)
 		for ix in $PACKAGE_LIST	
-
 		do
 			if [[ " $ix " == *" workbench "* ]]; then
 				if snap list mysql-workbench-community >/dev/null 2>&1 ;then
-					echo "****Unstalling Workbench... please wait****"
+					echo "**** Unstalling Workbench... please wait ****"
 					snap remove mysql-workbench-community
 					echo " * * Finished * * "
 				fi
 			fi
 			if [[ " $ix " == *" mysql "* ]]; then
-				echo "****Uninstalling MySQL $MYSQL_RELEASE ... please wait****"
+				echo "**** Uninstalling MySQL $MYSQL_RELEASE... please wait ****"
 				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
-				MYSQL_BIN_DIR=$(dirname $(readlink ${USER_HOME}/.local/bin/mysqld_safe))
-				#remove .local/bin links
-				for i in $(ls -1 $MYSQL_BIN_DIR)
-				do 
-					target=${USER_HOME}/.local/bin/$i
+				MYSQLD_SAFE_BIN=${USER_HOME}/.local/bin/mysqld_safe 
+				if [ -e $MYSQLD_SAFE_BIN ]; then
+					MYSQL_BIN_DIR=$(dirname $(readlink $MYSQLD_SAFE_BIN))
+					if [ -e "${MYSQL_BIN_DIR}" ]; then
+						#remove .local/bin links
+						for i in $(ls -1 $MYSQL_BIN_DIR)
+						do 
+							target=${USER_HOME}/.local/bin/$i
+							[ -e $target ] && rm -vfr "$target"
+						done
+						MYSQL_WRK_DIR=$(dirname $MYSQL_BIN_DIR)
+						MYSQL_WRK_DIR=$(basename $MYSQL_WRK_DIR)
+					fi
+				fi
+				if [ -z $MYSQL_WRK_DIR ]; then
+					if [ -e "${USER_HOME}/.local/mysql-*minimal" ]; then
+						MYSQL_WRK_DIR=$(ls -1 ${USER_HOME}/.local/mysql-*minimal|head -n1)
+						echo "SELECTED $MYSQL_WRK_DIR"
+					fi
+				fi
+				if [ -n $MYSQL_WRK_DIR ]; then	
+					target=${USER_HOME}/.local/${MYSQL_WRK_DIR}
 					[ -e $target ] && rm -vfr "$target"
-				done
-				MYSQL_WRK_DIR=$(dirname $MYSQL_BIN_DIR)
-				MYSQL_WRK_DIR=$(basename $MYSQL_WRK_DIR)
-				target=${USER_HOME}/.local/${MYSQL_WRK_DIR}
-				[ -e $target ] && rm -vfr "$target"
+					echo "REMOVED $target"
+					echo "SELECTED $MYSQL_WRK_DIR"
+				fi
 				echo " * * Finished * * "
 			fi
 		done
