@@ -10,7 +10,9 @@ PACKAGE_LIST=$@
 
 # START Define variables
 DESTDOWNLOAD="/var/cache/epi-downloads"
-MYSQL_RELEASE=8.0
+MYSQL_MAJOR_RELEASE=9.7
+MYSQL_RELEASE=${MYSQL_MAJOR_RELEASE}.4
+MYSQL_URL="https://dev.mysql.com/get/Downloads/MySQL-${MYSQL_MAJOR_RELEASE}/mysql-${MYSQL_RELEASE}-linux-glibc2.28-x86_64-minimal.tar.xz"
 # END Define Variables
 
 
@@ -25,7 +27,8 @@ case $ACTION in
 					echo 1
 				fi
 			elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
-					if [ -n "$(docker images -q mysql:${MYSQL_RELEASE})" ]; then
+					USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
+					if [ -e "${USER_HOME}/.local/bin/mysqld_safe" ]; then
 						echo 0
 					else
 						echo 1
@@ -36,23 +39,27 @@ case $ACTION in
 	;;
 
 	installPackage)
-
 			if [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
-				echo "****Installing MySQL $MYSQL_RELEASE docker... please wait****"
-				docker image pull mysql:$MYSQL_RELEASE 
-				inst="$(docker ps -a -q -f ancestor=mysql:$MYSQL_RELEASE)"
-				if [ -n "${inst}" ]; then
-					docker rm -f "${inst}"
-				fi
-				cp /usr/share/zero-lliurex-mysql/mysqlrun /usr/bin/mysqlrun
-				cp $ICON /usr/share/applications
-				chmod +x /usr/bin/mysqlrun
-				cp $FILE /usr/share/polkit-1/actions/
-				systemctl restart polkit
+				f=$(mktemp --suffix=.tar.xz)
+				fname=$(basename $f).zip
+				/usr/share/zero-lliurex-mysql/mysql-downloader.py $f $MYSQL_URL
+				d=$(mktemp -d)
+				mv $f ${d}/${fname}
+				cd $d
+				tar -Jxvf $fname
+				MYSQL_DIR=$(tar -Jtvf $fname  | head -n1| grep -o mysql.*)
+				MYSQL_DIR=${MYSQL_DIR/\/*/}
+				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
+				USER_NAME=$(id -un $PKEXEC_UID)
+				chown -hR $USER_NAME:$USER_NAME $MYSQL_DIR 
+				mv -v $MYSQL_DIR $USER_HOME/.local/
+				mkdir $USER_HOME/.local/bin/ || true
+				ln -vs $USER_HOME/.local/$MYSQL_DIR/bin/* $USER_HOME/.local/bin/
+				$USER_HOME/.local/$MYSQL_DIR/bin/mysqld --initialize --user=$USER_NAME
+				#/usr/bin/desktop-file-install /usr/share/zero-lliurex-soundshow/app.soundshow.soundshow.desktop 
 				echo " * * Finished * * "
 				echo " **********************************************************"
 				echo " *################### MYSQL INSTALLED ####################*"
-				echo " *   Use /usr/bin/mysqlrun to manage the MySQL instance   *"
 				echo " **********************************************************"
 			fi
 			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
@@ -73,18 +80,19 @@ case $ACTION in
 				fi
 			fi
 			if [[ " $ix " == *" mysql "* ]]; then
-				echo "****Uninstalling MySQL $MYSQL_RELEASE docker... please wait****"
-				inst="$(docker ps -a -q -f ancestor=mysql)"
-				if [ -n "${inst}" ]; then
-					docker rm -f "${inst}"
-				fi
-				imgs="$(docker images -q mysql:$MYSQL_RELEASE)"
-				if [ -n "${imgs}" ];then
-					docker rmi "${imgs}"
-				fi
-				rm -f /usr/bin/mysqlrun
-				rm -f $PFILE
-				systemctl restart polkit
+				echo "****Uninstalling MySQL $MYSQL_RELEASE ... please wait****"
+				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
+				MYSQL_BIN_DIR=$(dirname $(readlink ${USER_HOME}/.local/bin/mysqld_safe))
+				#remove .local/bin links
+				for i in $(ls -1 $MYSQL_BIN_DIR)
+				do 
+					target=${USER_HOME}/.local/bin/$i
+					[ -e $target ] && rm -vfr "$target"
+				done
+				MYSQL_WRK_DIR=$(dirname $MYSQL_BIN_DIR)
+				MYSQL_WRK_DIR=$(basename $MYSQL_WRK_DIR)
+				target=${USER_HOME}/.local/${MYSQL_WRK_DIR}
+				[ -e $target ] && rm -vfr "$target"
 				echo " * * Finished * * "
 			fi
 		done

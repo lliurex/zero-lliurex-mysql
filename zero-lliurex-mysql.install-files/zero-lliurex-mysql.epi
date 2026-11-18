@@ -5,6 +5,5 @@
 	"repository": [],
 	"zomando":"zero-lliurex-mysql",
 	"custom_icon_path":"/usr/share/zero-lliurex-mysql/",
-	"depends": "/usr/share/zero-lliurex-docker/docker.epi",
 	"selection_enabled":{"active":true,"all_selected":false}
 }
