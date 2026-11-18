@@ -28,5 +28,5 @@ bin=$(basename $0)
 if [[ $(basename $0) != "mysqlrun" ]]; then
 	$BINDIR/$bin --datadir=$DATADIR "$@" || $BINDIR/$bin "$@"
 elif [[ $1 == "run" ]]; then
-	$BINDIR/mysqld --datadir=$DATADIR "$@"
+	BINDIR/mysqld --datadir=$DATADIR
 fi
