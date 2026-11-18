@@ -4,70 +4,82 @@ ACTION="$1"
 
 shift
 
-PFILE=/usr/share/zero-lliurex-mysql/net.lliurex.mysqlrun.policy 
-ICON=/usr/share/zero-lliurex-mysql/mysql.png
 PACKAGE_LIST=$@
 
 # START Define variables
-DESTDOWNLOAD="/var/cache/epi-downloads"
 MYSQL_MAJOR_RELEASE=9.7
 MYSQL_RELEASE=${MYSQL_MAJOR_RELEASE}.4
 MYSQL_URL="https://dev.mysql.com/get/Downloads/MySQL-${MYSQL_MAJOR_RELEASE}/mysql-${MYSQL_RELEASE}-linux-glibc2.28-x86_64-minimal.tar.xz"
+MYSQL_INSTALL_FILES="/usr/share/zero-lliurex-mysql/mysql.install"
+MYSQL_INSTALL_DIR=""
+DEST_DIR="/opt"
 # END Define Variables
 
+function _getStatus
+{
+	INSTALLED=1
+	if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
+		if snap list mysql-workbench-community >/dev/null 2>&1 ;then
+			INSTALLED=0
+		fi
+	elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
+			if [ -e $MYSQL_INSTALL_FILES ]; then
+				MYSQL_INSTALL_DIR=$(head -n1 $MYSQL_INSTALL_FILES)
+				MYSQL_INSTALL_DIR=${MYSQL_INSTALL_DIR/\/*/}
+				MYSQL_INSTALL_DIR=${DEST_DIR}/${MYSQL_INSTALL_DIR}
+				[ -e $MYSQL_INSTALL_DIR ] && INSTALLED=0
+			fi
+	fi
+	echo $INSTALLED
+}
 
 
 case $ACTION in
 
 	getStatus)
-			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
-				if snap list mysql-workbench-community >/dev/null 2>&1 ;then
-					echo 0
-				else
-					echo 1
-				fi
-			elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
-					USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
-					USER_HOME=/home/lliurex
-					if [ -e "${USER_HOME}/.local/bin/mysqld_safe" ]; then
-						echo 0
-					else
-						[ -e ${USER_HOME}/.local/mysql-*minimal ] && echo 0 || echo 1
-					fi
-			else
-				echo 1
-			fi
+		_getStatus
+	;;
+
+	preInstall)
+		if [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
+			apt-cache show libaio1t64 1>/dev/null 2>&1 || apt-get install -y libaio && apt-get -y install libaio1t64
+		fi
 	;;
 
 	installPackage)
 			if [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
 				f=$(mktemp --suffix=.tar.xz)
-				fname=$(basename $f).zip
+				fname=$(basename $f)
 				/usr/share/zero-lliurex-mysql/mysql-downloader.py $f $MYSQL_URL
 				d=$(mktemp -d)
 				mv $f ${d}/${fname}
 				cd $d
-				tar -Jxvf $fname
-				MYSQL_DIR=$(tar -Jtvf $fname  | head -n1| grep -o mysql.*)
+				tar -Jxvf $fname > $MYSQL_INSTALL_FILES
+				MYSQL_DIR=$(head -n1 $MYSQL_INSTALL_FILES | grep -o mysql.*)
 				MYSQL_DIR=${MYSQL_DIR/\/*/}
-				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
 				USER_NAME=$(id -un $PKEXEC_UID)
-				chown -hR $USER_NAME:$USER_NAME $MYSQL_DIR 
-				mv -v $MYSQL_DIR $USER_HOME/.local/
-				mkdir $USER_HOME/.local/bin/ || true
-				ln -vs $USER_HOME/.local/$MYSQL_DIR/bin/* $USER_HOME/.local/bin/
-				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/bin/
-				$USER_HOME/.local/$MYSQL_DIR/bin/mysqld --initialize-insecure --user=$USER_NAME
+				mv -v $MYSQL_DIR $DEST_DIR
+				#MySQL needs libaio.so.1 but in noble the lib is libaio.so.1t64
+				#fix with a symbolic link
+				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $DEST_DIR/$MYSQL_DIR/lib/private/libaio.so.1
+				cp /usr/share/zero-lliurex-mysql/mysqlrun /usr/bin
+				sed -i "s/\[\[MYSQL_RELEASE\]\]/$(basename $MYSQL_DIR)/" /usr/bin/mysqlrun
+				desktop-file-install /usr/share/zero-lliurex-mysql/mysqlrun.desktop
 				echo " * * Finished * * "
 				echo " **********************************************************"
 				echo " *################### MYSQL INSTALLED ####################*"
-				echo " ROOT PASSWORD IS NOT SET. YOU MUST SET ONE AS SOON AS POSSIBLE"
+				echo " »»                Execute MySQL from menu               ««" 
 				echo " **********************************************************"
 			fi
 			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
 				echo "****Installing Workbench... please wait****"
 				snap install mysql-workbench-community
+				#Key permissions
 				sudo snap connect mysql-workbench-community:password-manager-service :password-manager-service
+				#Print permissions
+				sudo snap connect mysql-workbench-community:cups-control
+				#Just in case, enable ssh connections
+				sudo snap connect mysql-workbench-community:ssh-keys
 			fi
 	;;
 
@@ -78,41 +90,20 @@ case $ACTION in
 				if snap list mysql-workbench-community >/dev/null 2>&1 ;then
 					echo "**** Unstalling Workbench... please wait ****"
 					snap remove mysql-workbench-community
-					echo " * * Finished * * "
 				fi
 			fi
 			if [[ " $ix " == *" mysql "* ]]; then
 				echo "**** Uninstalling MySQL $MYSQL_RELEASE... please wait ****"
-				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
-				MYSQLD_SAFE_BIN=${USER_HOME}/.local/bin/mysqld_safe 
-				if [ -e $MYSQLD_SAFE_BIN ]; then
-					MYSQL_BIN_DIR=$(dirname $(readlink $MYSQLD_SAFE_BIN))
-					if [ -e "${MYSQL_BIN_DIR}" ]; then
-						#remove .local/bin links
-						for i in $(ls -1 $MYSQL_BIN_DIR)
-						do 
-							target=${USER_HOME}/.local/bin/$i
-							[ -e $target ] && rm -vfr "$target"
-						done
-						MYSQL_WRK_DIR=$(dirname $MYSQL_BIN_DIR)
-						MYSQL_WRK_DIR=$(basename $MYSQL_WRK_DIR)
-					fi
+				_getStatus
+				if [ $INSTALLED -eq 0 ]; then
+					LOCAL_MYSQL=${DEST_DIR}/$(basename $MYSQL_INSTALL_DIR)
+					[[ $MYSQL_INSTALL_DIR == $LOCAL_MYSQL ]] && rm -vfr $MYSQL_INSTALL_DIR
+					rm /usr/share/applications/mysqlrun.desktop
+					rm /usr/bin/mysqlrun
 				fi
-				if [ -z $MYSQL_WRK_DIR ]; then
-					if [ -e "${USER_HOME}/.local/mysql-*minimal" ]; then
-						MYSQL_WRK_DIR=$(ls -1 ${USER_HOME}/.local/mysql-*minimal|head -n1)
-						echo "SELECTED $MYSQL_WRK_DIR"
-					fi
-				fi
-				if [ -n $MYSQL_WRK_DIR ]; then	
-					target=${USER_HOME}/.local/${MYSQL_WRK_DIR}
-					[ -e $target ] && rm -vfr "$target"
-					echo "REMOVED $target"
-					echo "SELECTED $MYSQL_WRK_DIR"
-				fi
-				echo " * * Finished * * "
 			fi
 		done
+		echo " * * Finished * * "
 	;;
 esac
 

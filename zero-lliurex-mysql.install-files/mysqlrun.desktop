@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=MySQL Server
+GenericName=MySQL Server
+Comment=Run the MySql Server
+Comment[es]=Ejecuta el servidor MySQL
+Comment[ca]=Executa el servidor MySQL
+Exec=konsole --hold -e "/usr/bin/mysqlrun run"
+Terminal=false
+Type=Application
+Icon=/usr/share/zero-lliurex-mysql/mysql.png
+Categories=Development;Database
