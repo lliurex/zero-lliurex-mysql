@@ -4,39 +4,44 @@ ACTION="$1"
 
 shift
 
-PFILE=/usr/share/zero-lliurex-mysql/net.lliurex.mysqlrun.policy 
-ICON=/usr/share/zero-lliurex-mysql/mysql.png
 PACKAGE_LIST=$@
 
 # START Define variables
-DESTDOWNLOAD="/var/cache/epi-downloads"
 MYSQL_MAJOR_RELEASE=9.7
 MYSQL_RELEASE=${MYSQL_MAJOR_RELEASE}.4
 MYSQL_URL="https://dev.mysql.com/get/Downloads/MySQL-${MYSQL_MAJOR_RELEASE}/mysql-${MYSQL_RELEASE}-linux-glibc2.28-x86_64-minimal.tar.xz"
+MYSQL_INSTALL_FILES="/usr/share/zero-lliurex-mysql/mysql.install"
+MYSQL_INSTALL_DIR=""
 # END Define Variables
 
+function _getStatus
+{
+	INSTALLED=1
+	if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
+		if snap list mysql-workbench-community >/dev/null 2>&1 ;then
+			INSTALLED=0
+		fi
+	elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
+			USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
+			if [ -e $MYSQL_INSTALL_FILES ]; then
+				MYSQL_INSTALL_DIR=$(head -n1 $MYSQL_INSTALL_FILES)
+				MYSQL_INSTALL_DIR=${MYSQL_INSTALL_DIR/\/*/}
+				MYSQL_INSTALL_DIR=${USER_HOME}/.local/${MYSQL_INSTALL_DIR}
+				[ -e $MYSQL_INSTALL_DIR ] && INSTALLED=0
+			fi
+	fi
+	echo $INSTALLED
+}
 
 
 case $ACTION in
 
 	getStatus)
-			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
-				if snap list mysql-workbench-community >/dev/null 2>&1 ;then
-					echo 0
-				else
-					echo 1
-				fi
-			elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
-					USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
-					USER_HOME=/home/lliurex
-					if [ -e "${USER_HOME}/.local/bin/mysqld_safe" ]; then
-						echo 0
-					else
-						[ -e ${USER_HOME}/.local/mysql-*minimal ] && echo 0 || echo 1
-					fi
-			else
-				echo 1
-			fi
+		_getStatus
+	;;
+
+	preInstall)
+		apt-get -y install libaio1t64
 	;;
 
 	installPackage)
@@ -47,8 +52,8 @@ case $ACTION in
 				d=$(mktemp -d)
 				mv $f ${d}/${fname}
 				cd $d
-				tar -Jxvf $fname
-				MYSQL_DIR=$(tar -Jtvf $fname  | head -n1| grep -o mysql.*)
+				tar -Jxvf $fname > $MYSQL_INSTALL_FILES
+				MYSQL_DIR=$(head -n1 $MYSQL_INSTALL_FILES | grep -o mysql.*)
 				MYSQL_DIR=${MYSQL_DIR/\/*/}
 				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
 				USER_NAME=$(id -un $PKEXEC_UID)
@@ -61,7 +66,7 @@ case $ACTION in
 				echo " * * Finished * * "
 				echo " **********************************************************"
 				echo " *################### MYSQL INSTALLED ####################*"
-				echo " ROOT PASSWORD IS NOT SET. YOU MUST SET ONE AS SOON AS POSSIBLE"
+				echo " »» ROOT PASSWORD IS EMPTY. SET ONE AS SOON AS POSSIBLE ««"
 				echo " **********************************************************"
 			fi
 			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
@@ -78,41 +83,23 @@ case $ACTION in
 				if snap list mysql-workbench-community >/dev/null 2>&1 ;then
 					echo "**** Unstalling Workbench... please wait ****"
 					snap remove mysql-workbench-community
-					echo " * * Finished * * "
 				fi
 			fi
 			if [[ " $ix " == *" mysql "* ]]; then
 				echo "**** Uninstalling MySQL $MYSQL_RELEASE... please wait ****"
-				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
-				MYSQLD_SAFE_BIN=${USER_HOME}/.local/bin/mysqld_safe 
-				if [ -e $MYSQLD_SAFE_BIN ]; then
-					MYSQL_BIN_DIR=$(dirname $(readlink $MYSQLD_SAFE_BIN))
-					if [ -e "${MYSQL_BIN_DIR}" ]; then
-						#remove .local/bin links
-						for i in $(ls -1 $MYSQL_BIN_DIR)
-						do 
-							target=${USER_HOME}/.local/bin/$i
-							[ -e $target ] && rm -vfr "$target"
-						done
-						MYSQL_WRK_DIR=$(dirname $MYSQL_BIN_DIR)
-						MYSQL_WRK_DIR=$(basename $MYSQL_WRK_DIR)
-					fi
+				_getStatus
+				if [ $INSTALLED -eq 0 ]; then
+					for line in $(grep bin\/.* $MYSQL_INSTALL_FILES); do
+						link=${USER_HOME}/.local/bin/${line/*\//} 
+						readlink $link && rm -v $link
+					done
+					LOCAL_MYSQL=${USER_HOME}/.local/${link/\/*/}$(basename $MYSQL_INSTALL_DIR)
+					echo $LOCAL_MYSQL
+					[[ $MYSQL_INSTALL_DIR == $LOCAL_MYSQL ]] && rm -vfr $MYSQL_INSTALL_DIR
 				fi
-				if [ -z $MYSQL_WRK_DIR ]; then
-					if [ -e "${USER_HOME}/.local/mysql-*minimal" ]; then
-						MYSQL_WRK_DIR=$(ls -1 ${USER_HOME}/.local/mysql-*minimal|head -n1)
-						echo "SELECTED $MYSQL_WRK_DIR"
-					fi
-				fi
-				if [ -n $MYSQL_WRK_DIR ]; then	
-					target=${USER_HOME}/.local/${MYSQL_WRK_DIR}
-					[ -e $target ] && rm -vfr "$target"
-					echo "REMOVED $target"
-					echo "SELECTED $MYSQL_WRK_DIR"
-				fi
-				echo " * * Finished * * "
 			fi
 		done
+		echo " * * Finished * * "
 	;;
 esac
 
