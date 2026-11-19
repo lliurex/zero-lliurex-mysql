@@ -2,7 +2,6 @@
 #Wrapper that starts mysqld per user
 set -e
 
-
 ## INIT ##
 BINDIR=/opt/mysql-9.7.4-linux-glibc2.28-x86_64-minimal/bin
 DATADIR=$HOME/.local/share/mysql/datadir
@@ -14,7 +13,7 @@ for i in $(ls -1 $DATADIR); do
 	[[ $i == mysql ]] && let INIT=$INIT+1
 done
 
-[[ $INIT -lt 2 ]] && ${BINDIR}/mysqld --initialize-insecure --user=$USER_NAME --datadir=$DATADIR
+[[ $INIT -lt 2 ]] && ${BINDIR}/mysqld --initialize-insecure --datadir=$DATADIR
 
 if [[ ! -e $HOME/.local/bin/mysqld ]];then
 	mkdir $HOME/.local/bin || true
