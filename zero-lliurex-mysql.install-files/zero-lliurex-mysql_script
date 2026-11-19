@@ -65,7 +65,7 @@ case $ACTION in
 				ln -vs $USER_HOME/.local/$MYSQL_DIR/bin/* $USER_HOME/.local/bin/
 				#MySQL needs libaio.so.1 but in noble the lib is libaio.so.1t64
 				#fix with a symbolic link
-				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $USER_HOME/.local/$MYSQL_DIR/lib/private
+				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $USER_HOME/.local/$MYSQL_DIR/lib/private/libaio.so.1
 				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/bin/
 				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/$MYSQL_DIR
 				$USER_HOME/.local/$MYSQL_DIR/bin/mysqld --initialize-insecure --user=$USER_NAME
