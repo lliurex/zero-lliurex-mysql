@@ -1,0 +1,31 @@
+#!/bin/bash
+#Wrapper that starts mysqld per user
+set -e
+
+
+## INIT ##
+BINDIR=/opt/mysql-9.7.4-linux-glibc2.28-x86_64-minimal/bin
+DATADIR=$HOME/.local/share/mysql/datadir
+[ ! -e $DATADIR ] && mkdir -vp $DATADIR
+#Initialize db if needed
+INIT=0
+for i in $(ls -1 $DATADIR); do
+	[[ $i == ibdata1 ]] && let INIT=$INIT+1
+	[[ $i == mysql ]] && let INIT=$INIT+1
+done
+
+[[ $INIT -lt 2 ]] && ${BINDIR}/mysqld --initialize-insecure --user=$USER_NAME --datadir=$DATADIR
+
+if [[ ! -e $HOME/.local/bin/mysqld ]];then
+	mkdir $HOME/.local/bin || true
+	for mysql_bin in $(ls $BINDIR/*); do
+		ln -s /usr/bin/mysqlrun $HOME/.local/bin/$(basename ${mysql_bin})
+	done
+fi
+
+## MAIN ##
+bin=$(basename $0)
+
+if [[ $(basename $0) != "mysqlrun" ]]; then
+	$BINDIR/$bin --datadir=$DATADIR "$@" || $BINDIR/$bin "$@"
+fi
