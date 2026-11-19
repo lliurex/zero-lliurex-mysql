@@ -41,7 +41,9 @@ case $ACTION in
 	;;
 
 	preInstall)
-		apt-cache show libaio1t64 1>/dev/null 2>&1 || apt-get install -y libaio && apt-get -y install libaio1t64
+		if [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
+			apt-cache show libaio1t64 1>/dev/null 2>&1 || apt-get install -y libaio && apt-get -y install libaio1t64
+		fi
 	;;
 
 	installPackage)
@@ -61,7 +63,11 @@ case $ACTION in
 				mv -v $MYSQL_DIR $USER_HOME/.local/
 				mkdir $USER_HOME/.local/bin/ || true
 				ln -vs $USER_HOME/.local/$MYSQL_DIR/bin/* $USER_HOME/.local/bin/
+				#MySQL needs libaio.so.1 but in noble the lib is libaio.so.1t64
+				#fix with a symbolic link
+				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $USER_HOME/.local/$MYSQL_DIR/lib/private
 				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/bin/
+				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/$MYSQL_DIR
 				$USER_HOME/.local/$MYSQL_DIR/bin/mysqld --initialize-insecure --user=$USER_NAME
 				echo " * * Finished * * "
 				echo " **********************************************************"
