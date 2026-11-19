@@ -72,7 +72,12 @@ case $ACTION in
 			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
 				echo "****Installing Workbench... please wait****"
 				snap install mysql-workbench-community
+				#Key permissions
 				sudo snap connect mysql-workbench-community:password-manager-service :password-manager-service
+				#Print permissions
+				sudo snap connect mysql-workbench-community:cups-control
+				#Just in case, enable ssh connections
+				sudo snap connect mysql-workbench-community:ssh-keys
 			fi
 	;;
 
