@@ -62,7 +62,9 @@ case $ACTION in
 				#MySQL needs libaio.so.1 but in noble the lib is libaio.so.1t64
 				#fix with a symbolic link
 				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $DEST_DIR/$MYSQL_DIR/lib/private/libaio.so.1
-				#$DEST_DIR/$MYSQL_DIR/bin/mysqld --initialize-insecure --user=$USER_NAME
+				cp /usr/share/zero-lliurex-mysql/mysqlrun /usr/bin
+				sed -i "s/\[\[MYSQL_RELEASE\]\]/$(basename $MYSQL_INSTALL_DIR)/" /usr/bin/mysqlrun
+				desktop-file-install /usr/share/zero-lliurex-mysql/mysqlrun.desktop
 				echo " * * Finished * * "
 				echo " **********************************************************"
 				echo " *################### MYSQL INSTALLED ####################*"
@@ -96,6 +98,8 @@ case $ACTION in
 				if [ $INSTALLED -eq 0 ]; then
 					LOCAL_MYSQL=${DEST_DIR}/$(basename $MYSQL_INSTALL_DIR)
 					[[ $MYSQL_INSTALL_DIR == $LOCAL_MYSQL ]] && rm -vfr $MYSQL_INSTALL_DIR
+					rm /usr/share/applications/mysqlrun.desktop
+					rm /usr/bin/mysqlrun
 				fi
 			fi
 		done
