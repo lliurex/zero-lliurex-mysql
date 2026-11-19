@@ -12,6 +12,7 @@ MYSQL_RELEASE=${MYSQL_MAJOR_RELEASE}.4
 MYSQL_URL="https://dev.mysql.com/get/Downloads/MySQL-${MYSQL_MAJOR_RELEASE}/mysql-${MYSQL_RELEASE}-linux-glibc2.28-x86_64-minimal.tar.xz"
 MYSQL_INSTALL_FILES="/usr/share/zero-lliurex-mysql/mysql.install"
 MYSQL_INSTALL_DIR=""
+DEST_DIR="/opt"
 # END Define Variables
 
 function _getStatus
@@ -22,11 +23,10 @@ function _getStatus
 			INSTALLED=0
 		fi
 	elif [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
-			USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
 			if [ -e $MYSQL_INSTALL_FILES ]; then
 				MYSQL_INSTALL_DIR=$(head -n1 $MYSQL_INSTALL_FILES)
 				MYSQL_INSTALL_DIR=${MYSQL_INSTALL_DIR/\/*/}
-				MYSQL_INSTALL_DIR=${USER_HOME}/.local/${MYSQL_INSTALL_DIR}
+				MYSQL_INSTALL_DIR=${DEST_DIR}/${MYSQL_INSTALL_DIR}
 				[ -e $MYSQL_INSTALL_DIR ] && INSTALLED=0
 			fi
 	fi
@@ -49,7 +49,7 @@ case $ACTION in
 	installPackage)
 			if [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
 				f=$(mktemp --suffix=.tar.xz)
-				fname=$(basename $f).zip
+				fname=$(basename $f)
 				/usr/share/zero-lliurex-mysql/mysql-downloader.py $f $MYSQL_URL
 				d=$(mktemp -d)
 				mv $f ${d}/${fname}
@@ -57,22 +57,16 @@ case $ACTION in
 				tar -Jxvf $fname > $MYSQL_INSTALL_FILES
 				MYSQL_DIR=$(head -n1 $MYSQL_INSTALL_FILES | grep -o mysql.*)
 				MYSQL_DIR=${MYSQL_DIR/\/*/}
-				USER_HOME=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
 				USER_NAME=$(id -un $PKEXEC_UID)
-				chown -hR $USER_NAME:$USER_NAME $MYSQL_DIR 
-				mv -v $MYSQL_DIR $USER_HOME/.local/
-				mkdir $USER_HOME/.local/bin/ || true
-				ln -vs $USER_HOME/.local/$MYSQL_DIR/bin/* $USER_HOME/.local/bin/
+				mv -v $MYSQL_DIR $DEST_DIR
 				#MySQL needs libaio.so.1 but in noble the lib is libaio.so.1t64
 				#fix with a symbolic link
-				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $USER_HOME/.local/$MYSQL_DIR/lib/private/libaio.so.1
-				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/bin/
-				chown -hR $USER_NAME:$USER_NAME $USER_HOME/.local/$MYSQL_DIR
-				$USER_HOME/.local/$MYSQL_DIR/bin/mysqld --initialize-insecure --user=$USER_NAME
+				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $DEST_DIR/$MYSQL_DIR/lib/private/libaio.so.1
+				#$DEST_DIR/$MYSQL_DIR/bin/mysqld --initialize-insecure --user=$USER_NAME
 				echo " * * Finished * * "
 				echo " **********************************************************"
 				echo " *################### MYSQL INSTALLED ####################*"
-				echo " »» ROOT PASSWORD IS EMPTY. SET ONE AS SOON AS POSSIBLE ««"
+				echo " »»                Execute MySQL from menu               ««" 
 				echo " **********************************************************"
 			fi
 			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
@@ -100,12 +94,7 @@ case $ACTION in
 				echo "**** Uninstalling MySQL $MYSQL_RELEASE... please wait ****"
 				_getStatus
 				if [ $INSTALLED -eq 0 ]; then
-					for line in $(grep bin\/.* $MYSQL_INSTALL_FILES); do
-						link=${USER_HOME}/.local/bin/${line/*\//} 
-						readlink $link && rm -v $link
-					done
-					LOCAL_MYSQL=${USER_HOME}/.local/${link/\/*/}$(basename $MYSQL_INSTALL_DIR)
-					echo $LOCAL_MYSQL
+					LOCAL_MYSQL=${DEST_DIR}/$(basename $MYSQL_INSTALL_DIR)
 					[[ $MYSQL_INSTALL_DIR == $LOCAL_MYSQL ]] && rm -vfr $MYSQL_INSTALL_DIR
 				fi
 			fi
