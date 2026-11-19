@@ -41,7 +41,7 @@ case $ACTION in
 	;;
 
 	preInstall)
-		apt-get -y install libaio1t64
+		apt-cache show libaio1t64 1>/dev/null 2>&1 || apt-get install -y libaio && apt-get -y install libaio1t64
 	;;
 
 	installPackage)
