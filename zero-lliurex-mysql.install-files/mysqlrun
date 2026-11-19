@@ -3,7 +3,7 @@
 set -e
 
 ## INIT ##
-BINDIR=/opt/mysql-9.7.4-linux-glibc2.28-x86_64-minimal/bin
+BINDIR="/opt/[[MYSQL_RELEASE]]/bin"
 DATADIR=$HOME/.local/share/mysql/datadir
 [ ! -e $DATADIR ] && mkdir -vp $DATADIR
 #Initialize db if needed
@@ -27,4 +27,6 @@ bin=$(basename $0)
 
 if [[ $(basename $0) != "mysqlrun" ]]; then
 	$BINDIR/$bin --datadir=$DATADIR "$@" || $BINDIR/$bin "$@"
+elif [[ $1 == "run" ]]; then
+	$BINDIR/mysqld --datadir=$DATADIR "$@"
 fi
