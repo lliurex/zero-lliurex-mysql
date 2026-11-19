@@ -63,7 +63,7 @@ case $ACTION in
 				#fix with a symbolic link
 				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $DEST_DIR/$MYSQL_DIR/lib/private/libaio.so.1
 				cp /usr/share/zero-lliurex-mysql/mysqlrun /usr/bin
-				sed -i "s/\[\[MYSQL_RELEASE\]\]/$(basename $MYSQL_INSTALL_DIR)/" /usr/bin/mysqlrun
+				sed -i "s/\[\[MYSQL_RELEASE\]\]/$(basename $MYSQL_DIR)/" /usr/bin/mysqlrun
 				desktop-file-install /usr/share/zero-lliurex-mysql/mysqlrun.desktop
 				echo " * * Finished * * "
 				echo " **********************************************************"
