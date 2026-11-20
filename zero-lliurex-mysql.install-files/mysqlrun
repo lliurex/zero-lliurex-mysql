@@ -17,13 +17,15 @@ class mysqlManager(QMainWindow):
 	def __init__(self):
 		super().__init__()
 		self.setWindowTitle("MySQL Manager")
-		self.text_edit = QTextEdit()
-		self.text_edit.setReadOnly(True)
-		self.start_button = QPushButton("Start Command")
-		self.start_button.clicked.connect(self.start_command)
-		self.process = QProcess(self)
+		icn=QIcon("/usr/share/zero-lliurex-mysql/mysql.png")
+		self.setWindowIcon(icn)
+		self.process=QProcess(self)
 		self.process.readyReadStandardOutput.connect(self._readOutput)
+		self.process.readyReadStandardError.connect(self._readOutput)
 		self.process.finished.connect(self._processEnd)
+		env=QProcess.systemEnvironment()
+		env.append("LD_LIBRARY_PATH=/opt/mysql-9.7.4-linux-glibc2.28-x86_64-minimal/lib")
+		self.process.setEnvironment(env)
 		wdg=self._renderGui()
 		self.setCentralWidget(wdg)
 	#def __init__(self):
@@ -50,26 +52,27 @@ class mysqlManager(QMainWindow):
 	#def _renderGui
 
 	def _readOutput(self):
-		output = self.process.readAllStandardOutput().data().decode()
+		output=self.process.readAllStandardOutput().data().decode()
+		print(output)
 		self.txtOutput.append(output)
+		error=self.process.readAllStandardError().data().decode()
+		print(error)
+		self.txtOutput.append(error)
 	#def _readOutput
 
 	def _processEnd(self,*args):
 		pass
 
 	def _stopServer(self,*args):
-		binDir=_getBinDir()
-		if binDir!="":
-			pass
+		self.process.terminate()
 	#def _stopServer
 
 	def _chkMySqlInitialized(self,dataDir):
 		init=True
 		if os.path.exists(dataDir)==False:
-			os.path.makedirs(dataDir)
+			os.makedirs(dataDir)
 		init=0
 		for f in os.scandir(dataDir):
-			print(f.name)
 			if f.name=="ibdata1":
 				init+=1
 			if f.name=="mysql":
@@ -81,9 +84,10 @@ class mysqlManager(QMainWindow):
 	
 	def _runServer(self,*args):
 		binDir=_getBinDir()
+		mysqld="{}/mysqld".format(binDir)
 		dataDir=_getDataDir()
-		if binDir!="":
-			mysqld="{}/mysqld".format(binDir)
+		if os.path.exists(mysqld):
+			self.process.setProgram(mysqld)
 			cmdArgs=["--datadir",dataDir]
 			if self._chkMySqlInitialized(dataDir)==False:
 				initArgs=cmdArgs+["--initialize-insecure"]
@@ -91,16 +95,9 @@ class mysqlManager(QMainWindow):
 			self.process.start(mysqld,cmdArgs)
 	#def _runServer
 
-	def start_command(self):
-		# Replace with your command
-		self.process.start("ping", ["-c", "100", "google.com"])
-
-	def read_output(self):
-		output = self.process.readAllStandardOutput().data().decode()
-		self.text_edit.append(output)
-
-	def process_finished(self):
-		self.text_edit.append("Command finished!")
+	def processFinished(self):
+		self.txtOutput.append("Command finished!")
+	#def processFinished
 
 def _getBinDir(*args):
 	binDir=""
@@ -129,7 +126,6 @@ def _getCmdFromArgs(*args):
 cmd=_getCmdFromArgs()
 if cmd=="mysqlrun":
 	app=QApplication(["MySQL"])
-
 	if os.path.islink(__file__)==True:
 		abspath=os.path.join(os.path.dirname(__file__),os.path.dirname(os.readlink(__file__)))
 	else:
@@ -138,7 +134,6 @@ if cmd=="mysqlrun":
 	mw.setMinimumWidth(mw.sizeHint().width()*1.6)
 	mw.setMinimumHeight(mw.sizeHint().width()*0.9)
 	mw.show()
-
 	if hasattr(app,"exec"):
 		sys.exit(app.exec())
 	else:
