@@ -42,7 +42,7 @@ case $ACTION in
 
 	preInstall)
 		if [[ " ${PACKAGE_LIST[*]} " == *" mysql "* ]]; then
-			apt-cache show libaio1t64 1>/dev/null 2>&1 || apt-get install -y libaio1 && apt-get -y install libaio1t64
+			apt-cache show libaio1t64 1>/dev/null 2>&1 && apt-get -y install libaio1t64 || apt-get install -y libaio1 
 		fi
 	;;
 
@@ -60,7 +60,7 @@ case $ACTION in
 				USER_NAME=$(id -un $PKEXEC_UID)
 				mv -v $MYSQL_DIR $DEST_DIR
 				#MySQL needs libaio.so.1 but in noble the lib is libaio.so.1t64
-				#fix with a symbolic link
+				#fix with a deferenced copy
 				[ -e /lib/x86_64-linux-gnu/libaio.so.1t64 ] && cp -L /lib/x86_64-linux-gnu/libaio.so.1t64 $DEST_DIR/$MYSQL_DIR/lib/private/libaio.so.1
 				cp /usr/share/zero-lliurex-mysql/mysqlrun /usr/bin
 				sed -i "s/\[\[MYSQL_RELEASE\]\]/$(basename $MYSQL_DIR)/" /usr/bin/mysqlrun
