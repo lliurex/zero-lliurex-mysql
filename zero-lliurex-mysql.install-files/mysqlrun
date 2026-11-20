@@ -1,32 +1,143 @@
-#!/bin/bash
-#Wrapper that starts mysqld per user
-set -e
+#!/usr/bin/env python3
+from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget
+from PySide2.QtGui import QIcon
+from PySide2.QtCore import QProcess
+import os,sys
+import subprocess
+import gettext
+gettext.textdomain('mysqlrun')
+_ = gettext.gettext
 
-## INIT ##
-BINDIR="/opt/[[MYSQL_RELEASE]]/bin"
-DATADIR=$HOME/.local/share/mysql/datadir
-[ ! -e $DATADIR ] && mkdir -vp $DATADIR
-#Initialize db if needed
-INIT=0
-for i in $(ls -1 $DATADIR); do
-	[[ $i == ibdata1 ]] && let INIT=$INIT+1
-	[[ $i == mysql ]] && let INIT=$INIT+1
-done
+class mysqlManager(QMainWindow):
+	def __init__(self):
+		super().__init__()
+		self.setWindowTitle("MySQL Manager")
+		self.text_edit = QTextEdit()
+		self.text_edit.setReadOnly(True)
+		self.start_button = QPushButton("Start Command")
+		self.start_button.clicked.connect(self.start_command)
+		self.process = QProcess(self)
+		self.process.readyReadStandardOutput.connect(self._readOutput)
+		self.process.finished.connect(self._processEnd)
+		wdg=self._renderGui()
+		self.setCentralWidget(wdg)
+	#def __init__(self):
 
-[[ $INIT -lt 2 ]] && ${BINDIR}/mysqld --initialize-insecure --datadir=$DATADIR
+	def _renderGui(self,*args):
+		wdg=QWidget()
+		lay=QGridLayout(wdg)
+		self.txtOutput=QTextEdit()
+		self.txtOutput.setReadOnly(True)
+		lay.addWidget(self.txtOutput,0,0,1,2)
+		btnStop=QPushButton(_("Stop"))
+		icn=QIcon.fromTheme("process-stop")
+		btnStop.setIcon(icn)
+		btnStop.clicked.connect(self._stopServer)
+		lay.addWidget(btnStop,1,0,1,1)
+		btnStart=QPushButton(_("Start"))
+		btnStart.clicked.connect(self._runServer)
+		icn=QIcon.fromTheme("system-run")
+		btnStart.setIcon(icn)
+		lay.addWidget(btnStart,1,1,1,1)
+		btnWrk=QPushButton(_("Workbench"))
+		lay.addWidget(btnWrk,2,0,1,2)
+		return(wdg)
+	#def _renderGui
 
-if [[ ! -e $HOME/.local/bin/mysqld ]];then
-	mkdir $HOME/.local/bin || true
-	for mysql_bin in $(ls $BINDIR/*); do
-		ln -s /usr/bin/mysqlrun $HOME/.local/bin/$(basename ${mysql_bin})
-	done
-fi
+	def _readOutput(self):
+		output = self.process.readAllStandardOutput().data().decode()
+		self.txtOutput.append(output)
+	#def _readOutput
 
-## MAIN ##
-bin=$(basename $0)
+	def _processEnd(self,*args):
+		pass
 
-if [[ $(basename $0) != "mysqlrun" ]]; then
-	$BINDIR/$bin --datadir=$DATADIR "$@" || $BINDIR/$bin "$@"
-elif [[ $1 == "run" ]]; then
-	$BINDIR/mysqld --datadir=$DATADIR
-fi
+	def _stopServer(self,*args):
+		binDir=_getBinDir()
+		if binDir!="":
+			pass
+	#def _stopServer
+
+	def _chkMySqlInitialized(self,dataDir):
+		init=True
+		if os.path.exists(dataDir)==False:
+			os.path.makedirs(dataDir)
+		init=0
+		for f in os.scandir(dataDir):
+			print(f.name)
+			if f.name=="ibdata1":
+				init+=1
+			if f.name=="mysql":
+				init+=1
+		if init<2:
+			init=False
+		return(init)
+	#def _chkMySqlInitialized
+	
+	def _runServer(self,*args):
+		binDir=_getBinDir()
+		dataDir=_getDataDir()
+		if binDir!="":
+			mysqld="{}/mysqld".format(binDir)
+			cmdArgs=["--datadir",dataDir]
+			if self._chkMySqlInitialized(dataDir)==False:
+				initArgs=cmdArgs+["--initialize-insecure"]
+				self.process.start(mysqld,initArgs)
+			self.process.start(mysqld,cmdArgs)
+	#def _runServer
+
+	def start_command(self):
+		# Replace with your command
+		self.process.start("ping", ["-c", "100", "google.com"])
+
+	def read_output(self):
+		output = self.process.readAllStandardOutput().data().decode()
+		self.text_edit.append(output)
+
+	def process_finished(self):
+		self.text_edit.append("Command finished!")
+
+def _getBinDir(*args):
+	binDir=""
+	for f in os.scandir("/opt"):
+		if f.name.startswith("mysql") and f.name.endswith("minimal"):
+			if os.path.exists(os.path.join(f.path,"bin")):
+				binDir=os.path.join(f.path,"bin")
+				break
+	return(binDir)
+#def _getBinDir
+
+def _getDataDir(*args):
+	try:
+		dataDir=os.path.join(os.environ["HOME"],".local","share","mysql","datadir")
+	except:
+		dataDir=""
+	return (dataDir)
+#def _getDataDir(*args):
+
+
+def _getCmdFromArgs(*args):
+	cmd=os.path.basename(sys.argv[0])
+	return(cmd)
+#def _getCmdFromArgs
+
+cmd=_getCmdFromArgs()
+if cmd=="mysqlrun":
+	app=QApplication(["MySQL"])
+
+	if os.path.islink(__file__)==True:
+		abspath=os.path.join(os.path.dirname(__file__),os.path.dirname(os.readlink(__file__)))
+	else:
+		abspath=os.path.dirname(__file__)
+	mw=mysqlManager()
+	mw.setMinimumWidth(mw.sizeHint().width()*1.6)
+	mw.setMinimumHeight(mw.sizeHint().width()*0.9)
+	mw.show()
+
+	if hasattr(app,"exec"):
+		sys.exit(app.exec())
+	else:
+		sys.exit(app.exec_())
+else:
+	bindDir=_getBinDir()
+	dataDir=_getDataDir()
