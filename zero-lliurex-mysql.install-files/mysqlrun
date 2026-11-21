@@ -7,7 +7,7 @@ except:
 	from PySide6.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget
 	from PySide6.QtGui import QIcon
 	from PySide6.QtCore import QProcess
-import os,sys
+import os,sys,time
 import subprocess
 import gettext
 gettext.textdomain('mysqlrun')
@@ -53,15 +53,15 @@ class mysqlManager(QMainWindow):
 
 	def _readOutput(self):
 		output=self.process.readAllStandardOutput().data().decode()
-		print(output)
-		self.txtOutput.append(output)
+		self.txtOutput.append(output.strip())
 		error=self.process.readAllStandardError().data().decode()
-		print(error)
-		self.txtOutput.append(error)
+		self.txtOutput.append(error.strip())
 	#def _readOutput
 
 	def _processEnd(self,*args):
-		pass
+		if "--initialize-insecure" in self.process.arguments():
+			self._runServer()
+	#def _processEnd
 
 	def _stopServer(self,*args):
 		self.process.terminate()
@@ -81,18 +81,23 @@ class mysqlManager(QMainWindow):
 			init=False
 		return(init)
 	#def _chkMySqlInitialized
+
+	def _initServer(self,mysqld,dataDir,initArgs):
+		self.txtOutput.append("Init DB...")
+		self.process.start(mysqld,initArgs)
+	#def _initServer(self,mysqld,dataDir):
 	
 	def _runServer(self,*args):
 		binDir=_getBinDir()
 		mysqld="{}/mysqld".format(binDir)
 		dataDir=_getDataDir()
+		cmdArgs=["--datadir",dataDir,"--persisted-globals-load"]
 		if os.path.exists(mysqld):
-			self.process.setProgram(mysqld)
-			cmdArgs=["--datadir",dataDir]
 			if self._chkMySqlInitialized(dataDir)==False:
 				initArgs=cmdArgs+["--initialize-insecure"]
-				self.process.start(mysqld,initArgs)
-			self.process.start(mysqld,cmdArgs)
+				self._initServer(mysqld,dataDir,initArgs)
+			else:
+				self.process.start(mysqld,cmdArgs)
 	#def _runServer
 
 	def processFinished(self):
