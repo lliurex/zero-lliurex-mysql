@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 try:
-	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget
+	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
 	from PySide2.QtGui import QIcon
 	from PySide2.QtCore import QProcess
 except:
-	from PySide6.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget
+	from PySide6.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
 	from PySide6.QtGui import QIcon
 	from PySide6.QtCore import QProcess
 import os,sys,time
@@ -35,7 +35,7 @@ class mysqlManager(QMainWindow):
 		lay=QGridLayout(wdg)
 		self.txtOutput=QTextEdit()
 		self.txtOutput.setReadOnly(True)
-		lay.addWidget(self.txtOutput,0,0,1,2)
+		lay.addWidget(self.txtOutput,0,0,1,3)
 		btnStop=QPushButton(_("Stop"))
 		icn=QIcon.fromTheme("process-stop")
 		btnStop.setIcon(icn)
@@ -46,8 +46,13 @@ class mysqlManager(QMainWindow):
 		icn=QIcon.fromTheme("system-run")
 		btnStart.setIcon(icn)
 		lay.addWidget(btnStart,1,1,1,1)
+		cmbTools=QComboBox()
+		cmbTools.setPlaceholderText("Utils")
+		cmbTools.addItem("mysqld_safe")
+		cmbTools.addItem("mysqld_initialize")
+		lay.addWidget(cmbTools,1,2,1,1)
 		btnWrk=QPushButton(_("Workbench"))
-		lay.addWidget(btnWrk,2,0,1,2)
+		lay.addWidget(btnWrk,2,0,1,3)
 		return(wdg)
 	#def _renderGui
 
