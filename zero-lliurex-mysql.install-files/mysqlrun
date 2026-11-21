@@ -2,11 +2,11 @@
 try:
 	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
 	from PySide2.QtGui import QIcon
-	from PySide2.QtCore import QProcess
+	from PySide2.QtCore import QProcess,Signal
 except:
 	from PySide6.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
 	from PySide6.QtGui import QIcon
-	from PySide6.QtCore import QProcess
+	from PySide6.QtCore import QProcess,Signal
 import os,sys,time
 import subprocess
 import gettext
@@ -19,6 +19,7 @@ class mysqlManager(QMainWindow):
 		self.setWindowTitle("MySQL Manager")
 		icn=QIcon("/usr/share/zero-lliurex-mysql/mysql.png")
 		self.setWindowIcon(icn)
+		self.workbench=QProcess(self)
 		self.process=QProcess(self)
 		self.process.readyReadStandardOutput.connect(self._readOutput)
 		self.process.readyReadStandardError.connect(self._readOutput)
@@ -46,15 +47,20 @@ class mysqlManager(QMainWindow):
 		icn=QIcon.fromTheme("system-run")
 		btnStart.setIcon(icn)
 		lay.addWidget(btnStart,1,1,1,1)
-		cmbTools=QComboBox()
-		cmbTools.setPlaceholderText("Utils")
-		cmbTools.addItem("mysqld_safe")
-		cmbTools.addItem("mysqld_initialize")
-		lay.addWidget(cmbTools,1,2,1,1)
+		self.cmbTools=QComboBox()
+		self.cmbTools.setPlaceholderText("Utils")
+		self.cmbTools.addItem("mysqld_safe")
+		self.cmbTools.addItem("mysqld_initialize")
+		lay.addWidget(self.cmbTools,1,2,1,1)
 		btnWrk=QPushButton(_("Workbench"))
+		btnWrk.clicked.connect(self._launchWorkbench)
 		lay.addWidget(btnWrk,2,0,1,3)
 		return(wdg)
 	#def _renderGui
+
+	def _launchWorkbench(self):
+		self.workbench.start("snap",["run","mysql-workbench-community"])
+	#def _launchWorkbench
 
 	def _readOutput(self):
 		output=self.process.readAllStandardOutput().data().decode()
@@ -70,6 +76,7 @@ class mysqlManager(QMainWindow):
 
 	def _stopServer(self,*args):
 		self.process.terminate()
+		self.cmbTools.setEnabled(True)
 	#def _stopServer
 
 	def _chkMySqlInitialized(self,dataDir):
@@ -103,6 +110,7 @@ class mysqlManager(QMainWindow):
 				self._initServer(mysqld,dataDir,initArgs)
 			else:
 				self.process.start(mysqld,cmdArgs)
+			self.cmbTools.setEnabled(False)
 	#def _runServer
 
 	def processFinished(self):
