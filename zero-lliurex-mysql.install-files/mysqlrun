@@ -7,8 +7,7 @@ except:
 	from PySide6.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
 	from PySide6.QtGui import QIcon
 	from PySide6.QtCore import QProcess,Signal
-import os,sys,time
-import subprocess
+import os,sys,time,shutil
 import gettext
 gettext.textdomain('mysqlrun')
 _ = gettext.gettext
@@ -24,6 +23,7 @@ class mysqlManager(QMainWindow):
 		self.process.readyReadStandardOutput.connect(self._readOutput)
 		self.process.readyReadStandardError.connect(self._readOutput)
 		self.process.finished.connect(self._processEnd)
+		self.process.started.connect(self._processStart)
 		env=QProcess.systemEnvironment()
 		env.append("LD_LIBRARY_PATH=/opt/mysql-9.7.4-linux-glibc2.28-x86_64-minimal/lib")
 		self.process.setEnvironment(env)
@@ -31,36 +31,39 @@ class mysqlManager(QMainWindow):
 		self.setCentralWidget(wdg)
 	#def __init__(self):
 
+	def closeEvent(self,event):
+		self._stopServer()
+		event.accept()
+		self.close()
+	#def closeEvent
+
 	def _renderGui(self,*args):
 		wdg=QWidget()
 		lay=QGridLayout(wdg)
 		self.txtOutput=QTextEdit()
 		self.txtOutput.setReadOnly(True)
 		lay.addWidget(self.txtOutput,0,0,1,3)
-		btnStop=QPushButton(_("Stop"))
+		self.btnStop=QPushButton(_("Stop"))
 		icn=QIcon.fromTheme("process-stop")
-		btnStop.setIcon(icn)
-		btnStop.clicked.connect(self._stopServer)
-		lay.addWidget(btnStop,1,0,1,1)
-		btnStart=QPushButton(_("Start"))
-		btnStart.clicked.connect(self._runServer)
+		self.btnStop.setIcon(icn)
+		self.btnStop.clicked.connect(self._stopServer)
+		lay.addWidget(self.btnStop,1,0,1,1)
+		self.btnStart=QPushButton(_("Start"))
+		self.btnStart.clicked.connect(self._runServer)
 		icn=QIcon.fromTheme("system-run")
-		btnStart.setIcon(icn)
-		lay.addWidget(btnStart,1,1,1,1)
+		self.btnStart.setIcon(icn)
+		lay.addWidget(self.btnStart,1,1,1,1)
 		self.cmbTools=QComboBox()
 		self.cmbTools.setPlaceholderText("Utils")
 		self.cmbTools.addItem("mysqld_safe")
 		self.cmbTools.addItem("mysqld_initialize")
+		self.cmbTools.activated.connect(self._launchCmd)
 		lay.addWidget(self.cmbTools,1,2,1,1)
 		btnWrk=QPushButton(_("Workbench"))
 		btnWrk.clicked.connect(self._launchWorkbench)
 		lay.addWidget(btnWrk,2,0,1,3)
 		return(wdg)
 	#def _renderGui
-
-	def _launchWorkbench(self):
-		self.workbench.start("snap",["run","mysql-workbench-community"])
-	#def _launchWorkbench
 
 	def _readOutput(self):
 		output=self.process.readAllStandardOutput().data().decode()
@@ -69,15 +72,57 @@ class mysqlManager(QMainWindow):
 		self.txtOutput.append(error.strip())
 	#def _readOutput
 
+	def _launchWorkbench(self):
+		self.workbench.start("snap",["run","mysql-workbench-community"])
+	#def _launchWorkbench
+
+	def _launchCmd(self,*args):
+		cmd=self.cmbTools.currentText()
+		binDir=_getBinDir()
+		dataDir=_getDataDir()
+		mysqld="{0}/{1}".format(binDir,cmd)
+		if cmd=="mysqld_safe":
+			cmdArgs=["--datadir={}".format(dataDir),"--persisted-globals-load"]
+			self.process.start(mysqld,cmdArgs)
+		else:
+			cmd="mysqld"
+			cmdArgs=["--datadir",dataDir,"--persisted-globals-load"]
+			mysqld="{0}/{1}".format(binDir,cmd)
+			if os.path.exists(dataDir):
+				shutil.rmtree(dataDir)
+			os.makedirs(dataDir)
+			self._initServer(mysqld,cmdArgs)
+	#def _launchCmd
+
+	def _processStart(self,*args):
+		self.cmbTools.setEnabled(False)
+		self.btnStart.setEnabled(False)
+		self.btnStop.setEnabled(True)
+	#def _processStart
+
 	def _processEnd(self,*args):
-		if "--initialize-insecure" in self.process.arguments():
-			self._runServer()
+		self.cmbTools.setEnabled(True)
+		self.btnStart.setEnabled(True)
+		self.btnStop.setEnabled(False)
 	#def _processEnd
 
 	def _stopServer(self,*args):
 		self.process.terminate()
-		self.cmbTools.setEnabled(True)
+		while self.process.state()!=QProcess.NotRunning:
+			time.sleep(0.1)
+			QApplication.processEvents()
 	#def _stopServer
+
+	def _initServer(self,mysqld,cmdArgs):
+		initArgs=cmdArgs+["--initialize-insecure"]
+		self.txtOutput.append("Init DB...")
+		self.process.start(mysqld,initArgs)
+		while self.process.state()!=QProcess.NotRunning:
+			QApplication.processEvents()
+			time.sleep(0.1)
+		self.process.terminate()
+		self.process.waitForFinished()
+	#def _initServer
 
 	def _chkMySqlInitialized(self,dataDir):
 		init=True
@@ -94,11 +139,6 @@ class mysqlManager(QMainWindow):
 		return(init)
 	#def _chkMySqlInitialized
 
-	def _initServer(self,mysqld,dataDir,initArgs):
-		self.txtOutput.append("Init DB...")
-		self.process.start(mysqld,initArgs)
-	#def _initServer(self,mysqld,dataDir):
-	
 	def _runServer(self,*args):
 		binDir=_getBinDir()
 		mysqld="{}/mysqld".format(binDir)
@@ -106,16 +146,9 @@ class mysqlManager(QMainWindow):
 		cmdArgs=["--datadir",dataDir,"--persisted-globals-load"]
 		if os.path.exists(mysqld):
 			if self._chkMySqlInitialized(dataDir)==False:
-				initArgs=cmdArgs+["--initialize-insecure"]
-				self._initServer(mysqld,dataDir,initArgs)
-			else:
-				self.process.start(mysqld,cmdArgs)
-			self.cmbTools.setEnabled(False)
+				self._initServer(mysqld,cmdArgs)
+			self.process.start(mysqld,cmdArgs)
 	#def _runServer
-
-	def processFinished(self):
-		self.txtOutput.append("Command finished!")
-	#def processFinished
 
 def _getBinDir(*args):
 	binDir=""
@@ -130,6 +163,8 @@ def _getBinDir(*args):
 def _getDataDir(*args):
 	try:
 		dataDir=os.path.join(os.environ["HOME"],".local","share","mysql","datadir")
+		if os.path.exists(dataDir)==False:
+			os.makedirs(dataDir)
 	except:
 		dataDir=""
 	return (dataDir)
@@ -157,5 +192,17 @@ if cmd=="mysqlrun":
 	else:
 		sys.exit(app.exec_())
 else:
-	bindDir=_getBinDir()
+	pargs=sys.argv
+	cmd=os.path.basename(pargs[0])
+	binDir=_getBinDir()
+	cmd="{0}/{1}".format(binDir,cmd)
 	dataDir=_getDataDir()
+	extendedArgs=list(set(pargs))
+	extendedArgs.extend(["--datadir={}".format(dataDir)])
+	pid=os.fork()
+	if pid==0:
+		os.execlp("/bin/sh","/bin/sh","-c","{0} {1} --console 2>&1| grep -vi datadir".format(cmd," ".join(extendedArgs)))
+	else:
+		p, status = os.waitpid(pid, 0)
+		if os.WIFEXITED(status) and os.WEXITSTATUS(status) != 0:
+			os.execvp(cmd,pargs)
