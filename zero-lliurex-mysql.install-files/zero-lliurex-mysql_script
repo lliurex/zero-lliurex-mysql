@@ -71,16 +71,18 @@ case $ACTION in
 				echo " »»                Execute MySQL from menu               ««" 
 				echo " **********************************************************"
 			fi
-			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
-				echo "****Installing Workbench... please wait****"
-				snap install mysql-workbench-community
-				#Key permissions
-				snap connect mysql-workbench-community:password-manager-service
-				#Print permissions
-				snap connect mysql-workbench-community:cups-control
-				#Just in case, enable ssh connections
-				snap connect mysql-workbench-community:ssh-keys
-			fi
+	;;
+
+	postInstall)
+		if [[ " ${PACKAGE_LIST[*]} " == *" mysql-workbench-community "* ]]; then
+			echo "****Connecting slots for snap...****"
+			#Key permissions
+			snap connect mysql-workbench-community:password-manager-service
+			#Print permissions
+			snap connect mysql-workbench-community:cups-control
+			#Just in case, enable ssh connections
+			snap connect mysql-workbench-community:ssh-keys
+		fi
 	;;
 
 	remove)
@@ -89,7 +91,7 @@ case $ACTION in
 			_getStatus
 			if [ $INSTALLED -eq 0 ]; then
 				if [[ " $ix " == *" mysql-workbench-community "* ]]; then
-					echo "**** Unstalling Workbench... please wait ****"
+					echo "**** Uninstalling Workbench... please wait ****"
 					snap remove mysql-workbench-community
 				fi
 				if [[ " $ix " == *" mysql "* ]]; then
