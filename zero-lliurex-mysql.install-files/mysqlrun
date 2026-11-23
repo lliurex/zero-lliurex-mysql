@@ -128,6 +128,13 @@ class mysqlManager(QObject):
 		os.makedirs(self.dataDir)
 	#def _cleanDataDir()
 
+	def _portError(self,port):
+		self.processOutput.emit("#########################")
+		self.processOutput.emit(">ERROR: PORT {} in use".format(port))
+		self.processOutput.emit("#########################")
+		self.processFinished.emit()
+	#def _portError
+
 	def initServer(self):
 		self._cleanDataDir()
 		self.processOutput.emit("mysqld init db...")
@@ -143,9 +150,7 @@ class mysqlManager(QObject):
 			self.process.waitForFinished()
 			self.processOutput.emit("Done!")
 		else:
-			self.processOutput.emit("******** ------- ********")
-			self.processOutput.emit("PORT {} in use".format(choosenPort))
-			self.processOutput.emit("******** ------- ********")
+			self._portError(port)
 	#def _initServer
 
 	def runServer(self,*args):
@@ -157,9 +162,7 @@ class mysqlManager(QObject):
 					self.initServer()
 				self.process.start(self.mysqld,cmdArgs)
 		else:
-			self.processOutput.emit("******** ------- ********")
-			self.processOutput.emit("PORT {} in use".format(port))
-			self.processOutput.emit("******** ------- ********")
+			self._portError(port)
 	#def _runServer
 
 	def runSafeServer(self):
@@ -168,9 +171,7 @@ class mysqlManager(QObject):
 			cmdArgs=["--persisted-globals-load","--bind-address=127.0.0.1","--port={}".format(port),"--datadir={}".format(self.dataDir),"--socket=","--mysqlx=OFF"]
 			self.process.start(self.mysqld,cmdArgs)
 		else:
-			self.processOutput.emit("******** ------- ********")
-			self.processOutput.emit("PORT {} in use".format(choosenPort))
-			self.processOutput.emit("******** ------- ********")
+			self._portError(port)
 	#def runSafeServer
 	
 	def stopServer(self,*args):
@@ -263,10 +264,13 @@ class mysqlGui(QMainWindow):
 		self.cmbTools.addItem("mysqld_safe")
 		self.cmbTools.addItem("mysqld_initialize")
 		self.cmbTools.activated.connect(self._launchCmd)
-		lay.addWidget(self.cmbTools,3,2,1,1)
+		lay.addWidget(self.cmbTools,3,1,1,1)
 		btnWrk=QPushButton(_("Workbench"))
+		pxm=QPixmap("/usr/share/zero-lliurex-mysql/workbench.png")
+		icn=QIcon(pxm)
+		btnWrk.setIcon(icn)
 		btnWrk.clicked.connect(self._launchWorkbench)
-		lay.addWidget(btnWrk,3,0,1,1)
+		lay.addWidget(btnWrk,3,2,1,1)
 		return(wdg)
 	#def _renderGui
 
