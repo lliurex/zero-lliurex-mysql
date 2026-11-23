@@ -1,3 +1,11 @@
+zero-lliurex-mysql (9.7.4) jammy; urgency=medium
+
+  * Installs mysql 9.7.4
+  * Installs Workbench snap
+  * Installs mysql manager minimal gui
+
+ -- Juanma1980 <juanma1980@gmail.com>  Mon, 23 Nov 2026 07:48:51 +0100
+
 zero-lliurex-mysql (8.0) jammy; urgency=medium
 
   * Initial release
