@@ -1,4 +1,4 @@
-zero-lliurex-mysql (9.7.4-0lliurex) jammy; urgency=medium
+zero-lliurex-mysql (9.7.4-1lliurex) jammy; urgency=medium
 
   * Installs mysql 9.7.4
   * Installs Workbench snap
