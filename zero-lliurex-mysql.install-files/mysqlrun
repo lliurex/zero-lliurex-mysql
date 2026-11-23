@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 try:
-	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox,QLabel
+	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox,QLabel,QSpinBox
 	from PySide2.QtGui import QIcon,QPixmap
 	from PySide2.QtCore import Qt,QProcess,Signal,QObject
 except:
@@ -8,9 +8,17 @@ except:
 	from PySide6.QtGui import QIcon,QPixmap
 	from PySide6.QtCore import Qt,QProcess,Signal
 import os,sys,time,shutil
+import socket
 import gettext
 gettext.textdomain('mysqlrun')
 _ = gettext.gettext
+
+
+
+
+
+
+
 
 class mysqlManager(QObject):
 	processFinished=Signal()
@@ -23,6 +31,7 @@ class mysqlManager(QObject):
 		self.mysqld=os.path.join(self.binDir,"mysqld")
 		self.libDir=os.path.join(baseDir,"lib")
 		self.dataDir=self._getDataDir()
+		self.cFile="{}/.config/mysqlrun.cnf".format(os.environ.get("HOME"))
 		self.process=QProcess(self)
 		self.process.readyReadStandardOutput.connect(self._readStdout)
 		self.process.readyReadStandardError.connect(self._readStderr)
@@ -32,6 +41,33 @@ class mysqlManager(QObject):
 		env.append("LD_LIBRARY_PATH={}".format(self.libDir))
 		self.process.setEnvironment(env)
 	#def __init__
+
+	def readConfig(self):
+		port=3307
+		if os.path.exists(self.cFile):
+			with open(self.cFile,"r")as f:
+				port=f.read().strip()
+		try:
+			port=int(port)
+		except:
+			port=3307
+		else:
+			if port<3307:
+				port=3307
+			elif port>3407:
+				port=3307
+		return(port)
+	#def readConfig(self):
+
+	def _isPortFree(self,port):
+		free=True
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			try:
+				s.bind(('127.0.0.1', int(port)))
+			except socket.error:
+				free=False
+		return(free)
+	#def _isPortFree
 
 	def _getBaseDir(*args):
 		baseDir=""
@@ -92,31 +128,50 @@ class mysqlManager(QObject):
 		os.makedirs(self.dataDir)
 	#def _cleanDataDir()
 
+	def _portError(self,port):
+		self.processOutput.emit("#########################")
+		self.processOutput.emit(">ERROR: PORT {} in use".format(port))
+		self.processOutput.emit("#########################")
+		self.processFinished.emit()
+	#def _portError
+
 	def initServer(self):
 		self._cleanDataDir()
 		self.processOutput.emit("mysqld init db...")
-		cmdArgs=["--datadir",self.dataDir,"--persisted-globals-load"]
-		initArgs=cmdArgs+["--initialize-insecure"]
-		self.process.start(self.mysqld,initArgs)
-		while self.process.state()!=QProcess.NotRunning:
-			QApplication.processEvents()
-			time.sleep(0.1)
-		self.process.terminate()
-		self.process.waitForFinished()
-		self.processOutput.emit("mysqld ready")
+		port=self.readConfig()
+		if self._isPortFree(port)==True:
+			cmdArgs=["--persisted-globals-load","--bind-address=127.0.0.1","--port={}".format(port),"--datadir={}".format(self.dataDir),"--socket=","--mysqlx=OFF"]
+			initArgs=cmdArgs+["--initialize-insecure"]
+			self.process.start(self.mysqld,initArgs)
+			while self.process.state()!=QProcess.NotRunning:
+				QApplication.processEvents()
+				time.sleep(0.1)
+			self.process.terminate()
+			self.process.waitForFinished()
+			self.processOutput.emit("Done!")
+		else:
+			self._portError(port)
 	#def _initServer
 
 	def runServer(self,*args):
-		cmdArgs=["--datadir",self.dataDir,"--persisted-globals-load"]
-		if os.path.exists(self.mysqld):
-			if self._chkMySqlInitialized()==False:
-				self.initServer()
-			self.process.start(self.mysqld,cmdArgs)
+		port=self.readConfig()
+		if self._isPortFree(port)==True:
+			cmdArgs=["--persisted-globals-load","--bind-address=127.0.0.1","--port={}".format(port),"--datadir={}".format(self.dataDir),"--socket=","--mysqlx=OFF"]
+			if os.path.exists(self.mysqld):
+				if self._chkMySqlInitialized()==False:
+					self.initServer()
+				self.process.start(self.mysqld,cmdArgs)
+		else:
+			self._portError(port)
 	#def _runServer
 
 	def runSafeServer(self):
-		cmdArgs=["--datadir={}".format(self.dataDir),"--persisted-globals-load"]
-		self.process.start(self.mysqld,cmdArgs)
+		port=self.readConfig()
+		if self._isPortFree(port)==True:
+			cmdArgs=["--persisted-globals-load","--bind-address=127.0.0.1","--port={}".format(port),"--datadir={}".format(self.dataDir),"--socket=","--mysqlx=OFF"]
+			self.process.start(self.mysqld,cmdArgs)
+		else:
+			self._portError(port)
 	#def runSafeServer
 	
 	def stopServer(self,*args):
@@ -141,10 +196,7 @@ class mysqlManager(QObject):
 		if len(cmdArgs)>1:
 			mysqlArgs.extend(list(set(cmdArgs[1:])))
 		extendedArgs=mysqlArgs.copy()
-		if os.path.basename(cmd)=="mysql":
-			extendedArgs.append("--datadir {}".format(self.dataDir))
-		else:
-			extendedArgs.append("--datadir={}".format(self.dataDir))
+		extendedArgs.append("--datadir={}".format(self.dataDir))
 		pid=os.fork()
 		if pid==0:
 			os.execlp("/bin/sh","/bin/sh","-c","{0} {1} --console 2>&1| grep -vi datadir".format(cmd," ".join(extendedArgs)))
@@ -163,9 +215,11 @@ class mysqlGui(QMainWindow):
 		self.setWindowIcon(icn)
 		self.mysql=mysqlManager()
 		self.mysql.processOutput.connect(self._readOutput)
-		self.mysql.processStarted.connect(self._processStart)
+		#self.mysql.processStarted.connect(self._processStart)
 		self.mysql.processFinished.connect(self._processEnd)
 		self.workbench=QProcess(self)
+		self.cFile="{}/.config/mysqlrun.cnf".format(os.environ.get("HOME"))
+		self.port=self.mysql.readConfig()
 		wdg=self._renderGui()
 		self.setCentralWidget(wdg)
 	#def __init__(self):
@@ -194,19 +248,29 @@ class mysqlGui(QMainWindow):
 		self.btnStop.setEnabled(False)
 		lay.addWidget(self.btnStop,2,0,1,1)
 		self.btnStart=QPushButton(_("Start"))
-		self.btnStart.clicked.connect(self.mysql.runServer)
+		self.btnStart.clicked.connect(self._processStart)
+		#self.mysql.processStarted.connect(self._processStart)
 		icn=QIcon.fromTheme("system-run")
 		self.btnStart.setIcon(icn)
 		lay.addWidget(self.btnStart,2,1,1,1)
+		self.spnPort=QSpinBox()
+		self.spnPort.setMinimum(3307)
+		self.spnPort.setMaximum(3407)
+		self.spnPort.setValue(self.port)
+		self.spnPort.setSuffix(" TCP/IP port")
+		lay.addWidget(self.spnPort,2,2,1,1)
 		self.cmbTools=QComboBox()
 		self.cmbTools.addItem("Utils")
 		self.cmbTools.addItem("mysqld_safe")
 		self.cmbTools.addItem("mysqld_initialize")
 		self.cmbTools.activated.connect(self._launchCmd)
-		lay.addWidget(self.cmbTools,2,2,1,1)
+		lay.addWidget(self.cmbTools,3,1,1,1)
 		btnWrk=QPushButton(_("Workbench"))
+		pxm=QPixmap("/usr/share/zero-lliurex-mysql/workbench.png")
+		icn=QIcon(pxm)
+		btnWrk.setIcon(icn)
 		btnWrk.clicked.connect(self._launchWorkbench)
-		lay.addWidget(btnWrk,3,0,1,3)
+		lay.addWidget(btnWrk,3,2,1,1)
 		return(wdg)
 	#def _renderGui
 
@@ -219,6 +283,9 @@ class mysqlGui(QMainWindow):
 	#def _launchWorkbench
 
 	def _launchCmd(self,*args):
+		if self.spnPort.cleanText()!=self.port:
+			with open(self.cFile,"w") as f:
+				f.write(str(self.spnPort.value()))
 		if self.cmbTools.currentIndex()>0:
 			cmd=self.cmbTools.currentText()
 			if cmd=="mysqld_initialize":
@@ -228,11 +295,15 @@ class mysqlGui(QMainWindow):
 	#def _launchCmd
 
 	def _processStart(self,*args):
+		if self.spnPort.cleanText()!=self.port:
+			with open(self.cFile,"w") as f:
+				f.write(str(self.spnPort.cleanText()))
 		self.setCursor(Qt.WaitCursor)
 		self.txtOutput.setCursor(Qt.WaitCursor)
 		self.cmbTools.setEnabled(False)
 		self.btnStart.setEnabled(False)
 		self.btnStop.setEnabled(True)
+		self.mysql.runServer()
 	#def _processStart
 
 	def _processEnd(self,*args):
