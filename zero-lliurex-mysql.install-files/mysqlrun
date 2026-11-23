@@ -13,16 +13,10 @@ import gettext
 gettext.textdomain('mysqlrun')
 _ = gettext.gettext
 
-
-
-
-
-
-
-
 class mysqlManager(QObject):
 	processFinished=Signal()
 	processStarted=Signal()
+	processRunning=Signal()
 	processOutput=Signal(str)
 	def __init__(self):
 		super().__init__()
@@ -37,6 +31,7 @@ class mysqlManager(QObject):
 		self.process.readyReadStandardError.connect(self._readStderr)
 		self.process.finished.connect(self._processFinished)
 		self.process.started.connect(self._processStarted)
+		self.process.stateChanged.connect(self._processChanged)
 		env=QProcess.systemEnvironment()
 		env.append("LD_LIBRARY_PATH={}".format(self.libDir))
 		self.process.setEnvironment(env)
@@ -91,6 +86,11 @@ class mysqlManager(QObject):
 	def _processFinished(self,*args):
 		self.processFinished.emit()
 	#def _processFinished
+
+	def _processChanged(self,*args):
+		if args[0]==QProcess.ProcessState.Running:
+			self.processRunning.emit()
+	#def _processChanged
 
 	def _processStarted(self,*args):
 		self.processStarted.emit()
@@ -215,9 +215,11 @@ class mysqlGui(QMainWindow):
 		self.setWindowIcon(icn)
 		self.mysql=mysqlManager()
 		self.mysql.processOutput.connect(self._readOutput)
-		#self.mysql.processStarted.connect(self._processStart)
+		self.mysql.processStarted.connect(self._processStart)
+		self.mysql.processRunning.connect(self._processRun)
 		self.mysql.processFinished.connect(self._processEnd)
 		self.workbench=QProcess(self)
+		self.workbench.finished.connect(lambda: self.btnWrk.setEnabled(True))
 		self.cFile="{}/.config/mysqlrun.cnf".format(os.environ.get("HOME"))
 		self.port=self.mysql.readConfig()
 		wdg=self._renderGui()
@@ -248,8 +250,7 @@ class mysqlGui(QMainWindow):
 		self.btnStop.setEnabled(False)
 		lay.addWidget(self.btnStop,2,0,1,1)
 		self.btnStart=QPushButton(_("Start"))
-		self.btnStart.clicked.connect(self._processStart)
-		#self.mysql.processStarted.connect(self._processStart)
+		self.btnStart.clicked.connect(self._launchServer)
 		icn=QIcon.fromTheme("system-run")
 		self.btnStart.setIcon(icn)
 		lay.addWidget(self.btnStart,2,1,1,1)
@@ -265,12 +266,12 @@ class mysqlGui(QMainWindow):
 		self.cmbTools.addItem("mysqld_initialize")
 		self.cmbTools.activated.connect(self._launchCmd)
 		lay.addWidget(self.cmbTools,3,1,1,1)
-		btnWrk=QPushButton(_("Workbench"))
+		self.btnWrk=QPushButton(_("Workbench"))
 		pxm=QPixmap("/usr/share/zero-lliurex-mysql/workbench.png")
 		icn=QIcon(pxm)
-		btnWrk.setIcon(icn)
-		btnWrk.clicked.connect(self._launchWorkbench)
-		lay.addWidget(btnWrk,3,2,1,1)
+		self.btnWrk.setIcon(icn)
+		self.btnWrk.clicked.connect(self._launchWorkbench)
+		lay.addWidget(self.btnWrk,3,2,1,1)
 		return(wdg)
 	#def _renderGui
 
@@ -279,6 +280,7 @@ class mysqlGui(QMainWindow):
 	#def _readOutput
 
 	def _launchWorkbench(self):
+		self.btnWrk.setEnabled(False)
 		self.workbench.start("snap",["run","mysql-workbench-community"])
 	#def _launchWorkbench
 
@@ -294,17 +296,26 @@ class mysqlGui(QMainWindow):
 				self.mysql.runSafeServer()
 	#def _launchCmd
 
-	def _processStart(self,*args):
+	def _launchServer(self,*args):
 		if self.spnPort.cleanText()!=self.port:
 			with open(self.cFile,"w") as f:
 				f.write(str(self.spnPort.cleanText()))
-		self.setCursor(Qt.WaitCursor)
-		self.txtOutput.setCursor(Qt.WaitCursor)
+		self.mysql.runServer()
+	#def _launchServer
+
+	def _processStart(self,*args):
+		self.txtOutput.clear()
+		self.txtOutput.append(".......")
 		self.cmbTools.setEnabled(False)
 		self.btnStart.setEnabled(False)
 		self.btnStop.setEnabled(True)
-		self.mysql.runServer()
+		QApplication.processEvents()
 	#def _processStart
+
+	def _processRun(self,*args):
+		self.setCursor(self.oldCursor)
+		self.txtOutput.setCursor(self.oldCursor)
+	#def _processRun
 
 	def _processEnd(self,*args):
 		self.cmbTools.setEnabled(True)
