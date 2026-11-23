@@ -1,266 +1,208 @@
-#!/bin/bash
-set -e
-#set -x
+#!/usr/bin/env python3
+try:
+	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
+	from PySide2.QtGui import QIcon
+	from PySide2.QtCore import QProcess,Signal
+except:
+	from PySide6.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
+	from PySide6.QtGui import QIcon
+	from PySide6.QtCore import QProcess,Signal
+import os,sys,time,shutil
+import gettext
+gettext.textdomain('mysqlrun')
+_ = gettext.gettext
 
-COMPOSE_FILE_PATH=/usr/share/zero-lliurex-mysql/docker-compose.yml
+class mysqlManager(QMainWindow):
+	def __init__(self):
+		super().__init__()
+		self.setWindowTitle("MySQL Manager")
+		icn=QIcon("/usr/share/zero-lliurex-mysql/mysql.png")
+		self.setWindowIcon(icn)
+		self.workbench=QProcess(self)
+		self.process=QProcess(self)
+		self.process.readyReadStandardOutput.connect(self._readOutput)
+		self.process.readyReadStandardError.connect(self._readOutput)
+		self.process.finished.connect(self._processEnd)
+		self.process.started.connect(self._processStart)
+		env=QProcess.systemEnvironment()
+		env.append("LD_LIBRARY_PATH=/opt/mysql-9.7.4-linux-glibc2.28-x86_64-minimal/lib")
+		self.process.setEnvironment(env)
+		wdg=self._renderGui()
+		self.setCentralWidget(wdg)
+	#def __init__(self):
 
-SRC="${BASH_SOURCE[0]}"
+	def closeEvent(self,event):
+		self._stopServer()
+		event.accept()
+		self.close()
+	#def closeEvent
 
-ACTION=$1
+	def _renderGui(self,*args):
+		wdg=QWidget()
+		lay=QGridLayout(wdg)
+		self.txtOutput=QTextEdit()
+		self.txtOutput.setReadOnly(True)
+		lay.addWidget(self.txtOutput,0,0,1,3)
+		self.btnStop=QPushButton(_("Stop"))
+		icn=QIcon.fromTheme("process-stop")
+		self.btnStop.setIcon(icn)
+		self.btnStop.clicked.connect(self._stopServer)
+		lay.addWidget(self.btnStop,1,0,1,1)
+		self.btnStart=QPushButton(_("Start"))
+		self.btnStart.clicked.connect(self._runServer)
+		icn=QIcon.fromTheme("system-run")
+		self.btnStart.setIcon(icn)
+		lay.addWidget(self.btnStart,1,1,1,1)
+		self.cmbTools=QComboBox()
+		self.cmbTools.setPlaceholderText("Utils")
+		self.cmbTools.addItem("mysqld_safe")
+		self.cmbTools.addItem("mysqld_initialize")
+		self.cmbTools.activated.connect(self._launchCmd)
+		lay.addWidget(self.cmbTools,1,2,1,1)
+		btnWrk=QPushButton(_("Workbench"))
+		btnWrk.clicked.connect(self._launchWorkbench)
+		lay.addWidget(btnWrk,2,0,1,3)
+		return(wdg)
+	#def _renderGui
 
-if [ -n "$PKEXEC_UID" ]; then
-    IDUSER=$PKEXEC_UID
-    USER=$(getent passwd $IDUSER|cut -d: -f1)
-    IDGRP=$(id -g $USER)
-    HOME_USER=$(getent passwd $IDUSER|cut -d: -f6)
-else
-    IDUSER="$(id -u)"
-    IDGRP="$(id -g)"
-    USER="$(whoami)"
-    HOME_USER="$HOME"
-fi
+	def _readOutput(self):
+		output=self.process.readAllStandardOutput().data().decode()
+		self.txtOutput.append(output.strip())
+		error=self.process.readAllStandardError().data().decode()
+		self.txtOutput.append(error.strip())
+	#def _readOutput
 
-check_run(){
-    local tgt=$1
+	def _launchWorkbench(self):
+		self.workbench.start("snap",["run","mysql-workbench-community"])
+	#def _launchWorkbench
 
-    if [ -z "$tgt" ]; then
-	return 1
-    fi
-    DEBUG=0
-    if [ -n "$(set -o |grep xtrace|grep on)" ];then
-	DEBUG=1
-    fi
-    if [ $DEBUG -eq 1 ]; then
-	if $tgt ; then
-	    return 0
-	else
-	    return 1
-	fi
-    else
-	if $tgt 2>/dev/null >/dev/null; then
-	    return 0
-	else
-	    return 1
-	fi
-    fi
-}
+	def _launchCmd(self,*args):
+		cmd=self.cmbTools.currentText()
+		binDir=_getBinDir()
+		dataDir=_getDataDir()
+		mysqld="{0}/{1}".format(binDir,cmd)
+		if cmd=="mysqld_safe":
+			cmdArgs=["--datadir={}".format(dataDir),"--persisted-globals-load"]
+			self.process.start(mysqld,cmdArgs)
+		else:
+			cmd="mysqld"
+			cmdArgs=["--datadir",dataDir,"--persisted-globals-load"]
+			mysqld="{0}/{1}".format(binDir,cmd)
+			if os.path.exists(dataDir):
+				shutil.rmtree(dataDir)
+			os.makedirs(dataDir)
+			self._initServer(mysqld,cmdArgs)
+	#def _launchCmd
 
-check_installed(){
-    local tgt="$1"
-    if [ -z "$tgt" ];then
-	echo "Empty parameter calling check_installed"
-	return 1
-    fi
-    if [ -f "/usr/bin/${tgt}" ]; then
-	# echo "$tgt installed"
-	return 0
-    fi
-    echo "'$tgt' not available"
-    return 1
-}
+	def _processStart(self,*args):
+		self.cmbTools.setEnabled(False)
+		self.btnStart.setEnabled(False)
+		self.btnStop.setEnabled(True)
+	#def _processStart
 
-check_dir(){
-    local LDIR="$1"
-    if [ ! -d "$LDIR" ]; then
-	if ! mkdir -p "$LDIR";then
-	    echo "Unable to create $LDIR"
-	    exit 1
-	fi
-    fi
-    export RET="$(readlink -f $LDIR)"
-}
+	def _processEnd(self,*args):
+		self.cmbTools.setEnabled(True)
+		self.btnStart.setEnabled(True)
+		self.btnStop.setEnabled(False)
+	#def _processEnd
 
-do_checks(){
-    export_vars
-    check_installed docker
-    check_installed docker-compose
-    if check_run "docker ps"; then
-	export DOCKERCMD="docker"
-    else
-	if check_run "pkexec $SRC $ACTION"; then
-	    exit $?
-	else
-	    if check_run "sudo docker ps"; then
-		export DOCKERCMD="sudo -E docker"
-	    else
-		echo "Unable to run docker"
-		exit 1
-	    fi
-	fi
-    fi
-    if [ ! -f "$COMPOSE_FILE_PATH" ]; then
-	echo "Compose file unavailable, unable to continue"
-	exit 1
-    fi 
-    if check_run "docker-compose -f $COMPOSE_FILE_PATH images"; then
-	export COMPOSECMD="docker-compose -f $COMPOSE_FILE_PATH"
-    else
-	if check_run "pkexec $SRC $ACTION"; then
-	    exit $?
-	else
-	    if check_run "sudo docker-compose -f $COMPOSE_FILE_PATH images"; then
-		export COMPOSECMD="sudo -E docker-compose -f $COMPOSE_FILE_PATH"
-	    else
-		echo "Unable to run docker-compose"
-	        exit 1
-	    fi
-	fi
-    fi
-}
+	def _stopServer(self,*args):
+		self.process.terminate()
+		while self.process.state()!=QProcess.NotRunning:
+			time.sleep(0.1)
+			QApplication.processEvents()
+	#def _stopServer
 
-start_mysql(){
-    $COMPOSECMD start 
-}
+	def _initServer(self,mysqld,cmdArgs):
+		initArgs=cmdArgs+["--initialize-insecure"]
+		self.txtOutput.append("Init DB...")
+		self.process.start(mysqld,initArgs)
+		while self.process.state()!=QProcess.NotRunning:
+			QApplication.processEvents()
+			time.sleep(0.1)
+		self.process.terminate()
+		self.process.waitForFinished()
+	#def _initServer
 
-stop_mysql(){
-    $COMPOSECMD stop
-}
+	def _chkMySqlInitialized(self,dataDir):
+		init=True
+		if os.path.exists(dataDir)==False:
+			os.makedirs(dataDir)
+		init=0
+		for f in os.scandir(dataDir):
+			if f.name=="ibdata1":
+				init+=1
+			if f.name=="mysql":
+				init+=1
+		if init<2:
+			init=False
+		return(init)
+	#def _chkMySqlInitialized
 
-remove_mysql(){
-    $COMPOSECMD down 2>/dev/null 
-}
+	def _runServer(self,*args):
+		binDir=_getBinDir()
+		mysqld="{}/mysqld".format(binDir)
+		dataDir=_getDataDir()
+		cmdArgs=["--datadir",dataDir,"--persisted-globals-load"]
+		if os.path.exists(mysqld):
+			if self._chkMySqlInitialized(dataDir)==False:
+				self._initServer(mysqld,cmdArgs)
+			self.process.start(mysqld,cmdArgs)
+	#def _runServer
 
-export_vars(){
-	export MYSQL_ROOT_PASSWORD=12345
-	export MYSQL_DATABASE=mysql
-	export MYSQL_DATA_DIR=/var/lib/mysql
-    export USER_ID=$IDUSER
-    export GROUP_ID=$IDGRP
-}
-ret_vars(){
-    RET="MYSQL_DATA_DIR=$MYSQL_DATA_DIR MYSQL_DATABASE=$MYSQL_DATABASE IDUSER=$IDUSER IDGRP=$IDGRP HOME=$HOME_USER HOME_USER=$HOME_USER"
-}
+def _getBinDir(*args):
+	binDir=""
+	for f in os.scandir("/opt"):
+		if f.name.startswith("mysql") and f.name.endswith("minimal"):
+			if os.path.exists(os.path.join(f.path,"bin")):
+				binDir=os.path.join(f.path,"bin")
+				break
+	return(binDir)
+#def _getBinDir
 
-create_mysql(){
-    $COMPOSECMD up -d
-}
+def _getDataDir(*args):
+	try:
+		dataDir=os.path.join(os.environ["HOME"],".local","share","mysql","datadir")
+		if os.path.exists(dataDir)==False:
+			os.makedirs(dataDir)
+	except:
+		dataDir=""
+	return (dataDir)
+#def _getDataDir(*args):
 
-instances_created(){
-    local INSTANCES="$($COMPOSECMD ps -q)"
-    if [ -z "$INSTANCES" ]; then
-	return 1
-    else
-	return 0
-    fi
-}
 
-list_mysql_volumes(){
-    VOLS=$($DOCKERCMD volume ls -q|grep mysql||true)
-    RET=${VOLS:-"empty"}
-}
+def _getCmdFromArgs(*args):
+	cmd=os.path.basename(sys.argv[0])
+	return(cmd)
+#def _getCmdFromArgs
 
-clean_mysql(){
-    remove_mysql
-	list_mysql_volumes
-    MYSQL_VOLUMES="$RET"
-    if [ -n "$MYSQL_VOLUMES" -a "x$MYSQL_VOLUMES" != "xempty" ];then
-	for volume in $MYSQL_VOLUMES; do
-	    clean_volume $volume
-	done
-    fi
-}
-
-clean_volume(){
-    local vol="$1"
-    if [ -n "$vol" ]; then
-	echo "Cleaning docker volume $vol"
-	$DOCKERCMD volume rm $vol
-    fi
-}
-
-remove_dirs(){
-    if [ -d "$MAIN_CONFIG_DIR" ]; then
-	echo "Removing $MAIN_CONFIG_DIR"
-	rm -rf "$MAIN_CONFIG_DIR"
-    fi
-}
-
-help(){
-    echo " mysqlrun: Manages MySQL instance"
-    echo " "
-    echo " Usage:"
-    echo "      [sudo] mysqlrun [ACTION]"
-    echo " "
-    echo " Actions:"
-    echo "      start : start previously created MySQL server services instance"
-    echo "      stop : stop MySQL server services instance"
-    echo "      restart : restart MySQL server services instance"
-    echo "      create : create and start new MySQL server services instance"
-    echo "      remove : stop and destroy existing MySQL server services instance"
-    echo "      clean : stop and destroy existing MySQL server services instance with all volume data"
-    echo "      reallyclean : make clean action and remove personal user data into his home"
-    echo "      reconfigure : (Not implemented)"
-}
-
-if [ -z "$ACTION" ];then
-    help
-    exit 0
-fi
-
-do_checks
-
-case $ACTION in
-
-    start)
-	echo "Start mysql";
-	if instances_created; then
-	    start_mysql
-	else
-	    create_mysql
-	fi
-    ;;
-
-    stop)
-	echo "Stop mysql";
-	stop_mysql
-    ;;
-
-    restart)
-	echo "Restart mysql";
-	stop_mysql
-	start_mysql
-    ;;
-
-    remove)
-	echo "Removing mysql";
-	remove_mysql
-    ;;
-
-    create)
-	echo "Creating mysql";
-	if instances_created; then
-	    start_mysql
-	else
-	    create_mysql
-	fi
-    ;;
-    
-    clean)
-	echo "Cleaning mysql";
-	clean_mysql
-    ;;
-
-    reallyclean)
-	echo "Full cleaning mysql";
-	clean_mysql
-	remove_dirs
-    ;;
-
-    reconfigure)
-	echo "Reconfigure";
-    ;;
-
-    initialize)
-	echo "Initializing"
-	initialize_mysql
-	echo "Login with user root and password 12345 at localhost:3306"
-    ;;
-
-    *)
-	help
-    ;;
-
-esac
-
-echo "End"
-exit 0
+cmd=_getCmdFromArgs()
+if cmd=="mysqlrun":
+	app=QApplication(["MySQL"])
+	if os.path.islink(__file__)==True:
+		abspath=os.path.join(os.path.dirname(__file__),os.path.dirname(os.readlink(__file__)))
+	else:
+		abspath=os.path.dirname(__file__)
+	mw=mysqlManager()
+	mw.setMinimumWidth(mw.sizeHint().width()*1.6)
+	mw.setMinimumHeight(mw.sizeHint().width()*0.9)
+	mw.show()
+	if hasattr(app,"exec"):
+		sys.exit(app.exec())
+	else:
+		sys.exit(app.exec_())
+else:
+	pargs=sys.argv
+	cmd=os.path.basename(pargs[0])
+	binDir=_getBinDir()
+	cmd="{0}/{1}".format(binDir,cmd)
+	dataDir=_getDataDir()
+	extendedArgs=list(set(pargs))
+	extendedArgs.extend(["--datadir={}".format(dataDir)])
+	pid=os.fork()
+	if pid==0:
+		os.execlp("/bin/sh","/bin/sh","-c","{0} {1} --console 2>&1| grep -vi datadir".format(cmd," ".join(extendedArgs)))
+	else:
+		p, status = os.waitpid(pid, 0)
+		if os.WIFEXITED(status) and os.WEXITSTATUS(status) != 0:
+			os.execvp(cmd,pargs)
