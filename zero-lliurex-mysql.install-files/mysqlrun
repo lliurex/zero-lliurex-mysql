@@ -110,7 +110,7 @@ class mysqlManager(QObject):
 		cmdArgs=["--datadir",self.dataDir,"--persisted-globals-load"]
 		if os.path.exists(self.mysqld):
 			if self._chkMySqlInitialized()==False:
-				self._initServer()
+				self.initServer()
 			self.process.start(self.mysqld,cmdArgs)
 	#def _runServer
 
