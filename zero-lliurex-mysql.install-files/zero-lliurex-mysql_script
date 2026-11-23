@@ -75,11 +75,11 @@ case $ACTION in
 				echo "****Installing Workbench... please wait****"
 				snap install mysql-workbench-community
 				#Key permissions
-				sudo snap connect mysql-workbench-community:password-manager-service
+				snap connect mysql-workbench-community:password-manager-service
 				#Print permissions
-				sudo snap connect mysql-workbench-community:cups-control
+				snap connect mysql-workbench-community:cups-control
 				#Just in case, enable ssh connections
-				sudo snap connect mysql-workbench-community:ssh-keys
+				snap connect mysql-workbench-community:ssh-keys
 			fi
 	;;
 
