@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 try:
-	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
-	from PySide2.QtGui import QIcon
-	from PySide2.QtCore import QProcess,Signal,QObject
+	from PySide2.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox,QLabel
+	from PySide2.QtGui import QIcon,QPixmap
+	from PySide2.QtCore import Qt,QProcess,Signal,QObject
 except:
 	from PySide6.QtWidgets import QApplication,QTextEdit,QMainWindow,QPushButton,QGridLayout,QWidget,QComboBox
-	from PySide6.QtGui import QIcon
-	from PySide6.QtCore import QProcess,Signal
+	from PySide6.QtGui import QIcon,QPixmap
+	from PySide6.QtCore import Qt,QProcess,Signal
 import os,sys,time,shutil
 import gettext
 gettext.textdomain('mysqlrun')
@@ -85,15 +85,17 @@ class mysqlManager(QObject):
 		return(init)
 	#def _chkMySqlInitialized
 
-	def _cleanDataDir():
-		if os.path.exists(dataDir):
-			shutil.rmtree(dataDir)
-		os.makedirs(dataDir)
+	def _cleanDataDir(self):
+		self.processOutput.emit("mysqld clean db...")
+		if os.path.exists(self.dataDir):
+			shutil.rmtree(self.dataDir)
+		os.makedirs(self.dataDir)
 	#def _cleanDataDir()
 
 	def initServer(self):
 		self._cleanDataDir()
-		cmdArgs=["--datadir",dataDir,"--persisted-globals-load"]
+		self.processOutput.emit("mysqld init db...")
+		cmdArgs=["--datadir",self.dataDir,"--persisted-globals-load"]
 		initArgs=cmdArgs+["--initialize-insecure"]
 		self.process.start(self.mysqld,initArgs)
 		while self.process.state()!=QProcess.NotRunning:
@@ -101,6 +103,7 @@ class mysqlManager(QObject):
 			time.sleep(0.1)
 		self.process.terminate()
 		self.process.waitForFinished()
+		self.processOutput.emit("mysqld ready")
 	#def _initServer
 
 	def runServer(self,*args):
@@ -155,10 +158,13 @@ class mysqlGui(QMainWindow):
 	def __init__(self):
 		super().__init__()
 		self.setWindowTitle("MySQL Manager")
+		self.oldCursor=self.cursor()
 		icn=QIcon("/usr/share/zero-lliurex-mysql/mysql.png")
 		self.setWindowIcon(icn)
 		self.mysql=mysqlManager()
 		self.mysql.processOutput.connect(self._readOutput)
+		self.mysql.processStarted.connect(self._processStart)
+		self.mysql.processFinished.connect(self._processEnd)
 		self.workbench=QProcess(self)
 		wdg=self._renderGui()
 		self.setCentralWidget(wdg)
@@ -173,28 +179,34 @@ class mysqlGui(QMainWindow):
 	def _renderGui(self,*args):
 		wdg=QWidget()
 		lay=QGridLayout(wdg)
+		lblBanner=QLabel()
+		pxm=QPixmap("/usr/share/zero-lliurex-mysql/banner.png")
+		lblBanner.setPixmap(pxm)
+		lay.addWidget(lblBanner,0,1,1,1)
 		self.txtOutput=QTextEdit()
 		self.txtOutput.setReadOnly(True)
-		lay.addWidget(self.txtOutput,0,0,1,3)
+		self.txtOutput.setCursor(self.oldCursor)
+		lay.addWidget(self.txtOutput,1,0,1,3)
 		self.btnStop=QPushButton(_("Stop"))
 		icn=QIcon.fromTheme("process-stop")
 		self.btnStop.setIcon(icn)
 		self.btnStop.clicked.connect(self.mysql.stopServer)
-		lay.addWidget(self.btnStop,1,0,1,1)
+		self.btnStop.setEnabled(False)
+		lay.addWidget(self.btnStop,2,0,1,1)
 		self.btnStart=QPushButton(_("Start"))
 		self.btnStart.clicked.connect(self.mysql.runServer)
 		icn=QIcon.fromTheme("system-run")
 		self.btnStart.setIcon(icn)
-		lay.addWidget(self.btnStart,1,1,1,1)
+		lay.addWidget(self.btnStart,2,1,1,1)
 		self.cmbTools=QComboBox()
-		self.cmbTools.setPlaceholderText("Utils")
+		self.cmbTools.addItem("Utils")
 		self.cmbTools.addItem("mysqld_safe")
 		self.cmbTools.addItem("mysqld_initialize")
 		self.cmbTools.activated.connect(self._launchCmd)
-		lay.addWidget(self.cmbTools,1,2,1,1)
+		lay.addWidget(self.cmbTools,2,2,1,1)
 		btnWrk=QPushButton(_("Workbench"))
 		btnWrk.clicked.connect(self._launchWorkbench)
-		lay.addWidget(btnWrk,2,0,1,3)
+		lay.addWidget(btnWrk,3,0,1,3)
 		return(wdg)
 	#def _renderGui
 
@@ -207,14 +219,17 @@ class mysqlGui(QMainWindow):
 	#def _launchWorkbench
 
 	def _launchCmd(self,*args):
-		cmd=self.cmbTools.currentText()
-		if cmd=="mysqld_initialize":
-			self.mysql.initServer()
-		else:
-			self.mysql.runSafeServer()
+		if self.cmbTools.currentIndex()>0:
+			cmd=self.cmbTools.currentText()
+			if cmd=="mysqld_initialize":
+				self.mysql.initServer()
+			else:
+				self.mysql.runSafeServer()
 	#def _launchCmd
 
 	def _processStart(self,*args):
+		self.setCursor(Qt.WaitCursor)
+		self.txtOutput.setCursor(Qt.WaitCursor)
 		self.cmbTools.setEnabled(False)
 		self.btnStart.setEnabled(False)
 		self.btnStop.setEnabled(True)
@@ -224,6 +239,9 @@ class mysqlGui(QMainWindow):
 		self.cmbTools.setEnabled(True)
 		self.btnStart.setEnabled(True)
 		self.btnStop.setEnabled(False)
+		self.setCursor(self.oldCursor)
+		self.txtOutput.setCursor(self.oldCursor)
+		self.cmbTools.setCurrentIndex(0)
 	#def _processEnd
 #class mysqlGui
 
