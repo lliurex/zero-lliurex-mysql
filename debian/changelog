@@ -1,3 +1,9 @@
+zero-lliurex-mysql (9.7.4) noble; urgency=medium
+
+  * MySQL installer and manager
+
+ -- Juanma1980 <juanma1980@gmail.com>  Mon, 23 Nov 2026 08:28:40 +0100
+
 zero-lliurex-mysql (8.0) noble; urgency=medium
 
   * Initial release
