@@ -18,7 +18,7 @@ DEST_DIR="/opt"
 function _getStatus
 {
 	INSTALLED=1
-	if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
+	if [[ " ${PACKAGE_LIST[*]} " == *" mysql-workbench-community "* ]]; then
 		if snap list mysql-workbench-community >/dev/null 2>&1 ;then
 			INSTALLED=0
 		fi
@@ -71,31 +71,31 @@ case $ACTION in
 				echo " »»                Execute MySQL from menu               ««" 
 				echo " **********************************************************"
 			fi
-			if [[ " ${PACKAGE_LIST[*]} " == *" workbench "* ]]; then
-				echo "****Installing Workbench... please wait****"
-				snap install mysql-workbench-community
-				#Key permissions
-				sudo snap connect mysql-workbench-community:password-manager-service :password-manager-service
-				#Print permissions
-				sudo snap connect mysql-workbench-community:cups-control
-				#Just in case, enable ssh connections
-				sudo snap connect mysql-workbench-community:ssh-keys
-			fi
+	;;
+
+	postInstall)
+		if [[ " ${PACKAGE_LIST[*]} " == *" mysql-workbench-community "* ]]; then
+			echo "****Connecting slots for snap...****"
+			#Key permissions
+			snap connect mysql-workbench-community:password-manager-service
+			#Print permissions
+			snap connect mysql-workbench-community:cups-control
+			#Just in case, enable ssh connections
+			snap connect mysql-workbench-community:ssh-keys
+		fi
 	;;
 
 	remove)
 		for ix in $PACKAGE_LIST	
 		do
-			if [[ " $ix " == *" workbench "* ]]; then
-				if snap list mysql-workbench-community >/dev/null 2>&1 ;then
-					echo "**** Unstalling Workbench... please wait ****"
+			_getStatus
+			if [ $INSTALLED -eq 0 ]; then
+				if [[ " $ix " == *" mysql-workbench-community "* ]]; then
+					echo "**** Uninstalling Workbench... please wait ****"
 					snap remove mysql-workbench-community
 				fi
-			fi
-			if [[ " $ix " == *" mysql "* ]]; then
-				echo "**** Uninstalling MySQL $MYSQL_RELEASE... please wait ****"
-				_getStatus
-				if [ $INSTALLED -eq 0 ]; then
+				if [[ " $ix " == *" mysql "* ]]; then
+					echo "**** Uninstalling MySQL $MYSQL_RELEASE... please wait ****"
 					LOCAL_MYSQL=${DEST_DIR}/$(basename $MYSQL_INSTALL_DIR)
 					[[ $MYSQL_INSTALL_DIR == $LOCAL_MYSQL ]] && rm -vfr $MYSQL_INSTALL_DIR
 					rm /usr/share/applications/mysqlrun.desktop
